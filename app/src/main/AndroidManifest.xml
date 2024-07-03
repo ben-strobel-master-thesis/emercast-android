@@ -38,6 +38,14 @@
             android:name=".ble.GATTServerService"
             android:foregroundServiceType="connectedDevice" />
 
+        <service
+            android:name=".fcm.MessagingReceiverService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".ble.BLEScanReceiver"
             android:exported="false" />
