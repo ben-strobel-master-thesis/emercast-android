@@ -100,6 +100,16 @@ class MainActivity : ComponentActivity() {
             Log.d(this.javaClass.name, "Registered new FCM token $token")
             Toast.makeText(baseContext, "Registered new FCM token $token", Toast.LENGTH_SHORT).show()
         })
+
+        FirebaseMessaging.getInstance().subscribeToTopic("test")
+            .addOnCompleteListener { task ->
+                var msg = "Subscribed"
+                if (!task.isSuccessful) {
+                    msg = "Subscribe failed"
+                }
+                Log.d(this.javaClass.name, msg)
+                Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
+            }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
