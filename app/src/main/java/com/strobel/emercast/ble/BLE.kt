@@ -62,7 +62,7 @@ class BLE(private val advertiser: BluetoothLeAdvertiser, private val scanner: Bl
         val scanSettings: ScanSettings = ScanSettings.Builder()
             // There are other modes that might work better depending on the use case
             .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
-            // If not set the results will be batch while the screen is off till the screen is turned one again
+            // If not set the results will be batch while the screen is off till the screen is turned on again
             .setReportDelay(3000)
             // Use balanced, when in background it will be switched to low power
             .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
@@ -72,7 +72,8 @@ class BLE(private val advertiser: BluetoothLeAdvertiser, private val scanner: Bl
         val resultIntent = PendingIntent.getBroadcast(
             context,
             1,
-            Intent(context, BLEScanReceiver::class.java).putExtra("currentHash", currentHash),
+            Intent(context, BLEScanReceiver::class.java)
+                .putExtra("currentHash", currentHash),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
         )
 
@@ -88,10 +89,8 @@ class BLE(private val advertiser: BluetoothLeAdvertiser, private val scanner: Bl
 
     companion object {
         const val ACTUAL_16_BIT_SERVICE_UUID = "b570"
-        const val ACTUAL_16_BIT_CHARACTERISTIC_UUID = "b570"
         const val ACTUAL_16_BIT_HASH_DATA_UUID = "b571"
         val SERVICE_UUID: UUID = UUID.fromString("0000${ACTUAL_16_BIT_SERVICE_UUID}-0000-1000-8000-00805F9B34FB")
-        val CHARACTERISTIC_UUID: UUID = UUID.fromString("0000${ACTUAL_16_BIT_CHARACTERISTIC_UUID}-0000-1000-8000-00805F9B34FB")
         val SERVICE_HASH_DATA_UUID: UUID = UUID.fromString("0000${ACTUAL_16_BIT_HASH_DATA_UUID}-0000-1000-8000-00805F9B34FB")
         val TAG = "BLE_EXPERIMENT_MAIN_ACTIVITY"
         val REQUIRED_PERMISSIONS: Array<String> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) arrayOf(
