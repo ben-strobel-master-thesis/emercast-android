@@ -1,9 +1,12 @@
 package com.strobel.emercast
 
 import android.annotation.SuppressLint
-import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeAdvertiser
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -13,24 +16,24 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
 import com.strobel.emercast.ble.BLE
+import com.strobel.emercast.db.EmercastDbHelper
+import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
 import com.strobel.emercast.ui.theme.EmercastTheme
+import com.strobel.emercast.views.MessageListView
+import com.strobel.emercast.views.MessageListViewModel
 
 class MainActivity : ComponentActivity() {
     private val manager: BluetoothManager? get() = applicationContext.getSystemService()!!
-    private val advertiser: BluetoothLeAdvertiser? get() = manager?.adapter?.bluetoothLeAdvertiser;
-    private var ble: BLE? = null;
+    private val advertiser: BluetoothLeAdvertiser? get() = manager?.adapter?.bluetoothLeAdvertiser
+    private var ble: BLE? = null
+    private var newBroadcastMessageReceiver: BroadcastReceiver? = null
+    private var viewModel: MessageListViewModel? = null
 
     private fun hasPermissions(): Boolean {
         for (permission in BLE.REQUIRED_PERMISSIONS) {
@@ -48,14 +51,14 @@ class MainActivity : ComponentActivity() {
         if(manager?.adapter != null && !manager!!.adapter.isEnabled){
             Toast.makeText(this, "Bluetooth is disabled. Enable it and restart the app", Toast.LENGTH_LONG)
                 .show()
-            return;
+            return
         }
 
         val scanner = manager?.adapter?.bluetoothLeScanner
         if(scanner == null) {
             Toast.makeText(this, "Bluetooth Scanner not found", Toast.LENGTH_LONG)
                 .show()
-            return;
+            return
         }
         else {
             ble = BLE(advertiser!!)
@@ -110,20 +113,38 @@ class MainActivity : ComponentActivity() {
                 Log.d(this.javaClass.name, msg)
                 Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
             }
+
+        newBroadcastMessageReceiver = object: BroadcastReceiver() {
+            override fun onReceive(p0: Context?, p1: Intent?) {
+                Log.d(this.javaClass.name, "newBroadcastMessageReceiver received broadcast")
+                viewModel?.fetchAllMessages()
+            }
+        }
+        applicationContext.registerReceiver(newBroadcastMessageReceiver, IntentFilter("com.strobel.emercast.NEW_BROADCAST_MESSAGE"), RECEIVER_EXPORTED)
+        viewModel?.fetchAllMessages()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val dbHelper = EmercastDbHelper(applicationContext)
+        val repo = BroadcastMessagesRepository(dbHelper)
+        viewModel = MessageListViewModel(repo)
+        viewModel?.fetchAllMessages()
+
+        Log.d(this.javaClass.name, "Registed broadcastmessagereceiver")
+
         enableEdgeToEdge()
         setContent {
             EmercastTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                MessageListView(viewModel!!)
             }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if(newBroadcastMessageReceiver != null) {
+            applicationContext.unregisterReceiver(newBroadcastMessageReceiver)
         }
     }
 
@@ -155,21 +176,5 @@ class MainActivity : ComponentActivity() {
                 requestPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    EmercastTheme {
-        Greeting("Android")
     }
 }
