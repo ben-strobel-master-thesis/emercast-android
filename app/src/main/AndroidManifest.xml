@@ -34,9 +34,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <service
-            android:name=".ble.GATTServerService"
-            android:foregroundServiceType="connectedDevice" />
 
         <service
             android:name=".fcm.MessagingReceiverService"

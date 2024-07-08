@@ -16,7 +16,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import com.google.android.gms.tasks.OnCompleteListener
@@ -61,7 +60,8 @@ class MainActivity : ComponentActivity() {
             return
         }
         else {
-            ble = BLE(advertiser!!)
+            ble = BLE(advertiser!!, scanner, this)
+            viewModel?.setBLE(ble!!)
         }
         val requestPermissionLauncher =
             registerForActivityResult(
@@ -82,7 +82,7 @@ class MainActivity : ComponentActivity() {
         when {
             hasPermissions() -> {
                 // Bluetooth needs to be on, otherwise this will fail, should be properly communicated in actual app
-                ble?.startScan(this, scanner)
+                ble?.startScan()
                 ble?.startAdvertising()
             }
             else -> {
@@ -130,9 +130,6 @@ class MainActivity : ComponentActivity() {
         val repo = BroadcastMessagesRepository(dbHelper)
         viewModel = MessageListViewModel(repo)
         viewModel?.fetchAllMessages()
-
-        Log.d(this.javaClass.name, "Registed broadcastmessagereceiver")
-
         enableEdgeToEdge()
         setContent {
             EmercastTheme {

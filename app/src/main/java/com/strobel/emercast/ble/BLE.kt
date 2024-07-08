@@ -3,7 +3,6 @@ package com.strobel.emercast.ble
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.PendingIntent
-import android.bluetooth.BluetoothManager
 import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
@@ -19,7 +18,13 @@ import android.util.Log
 import androidx.annotation.RequiresPermission
 import java.util.UUID
 
-class BLE(private val advertiser: BluetoothLeAdvertiser) {
+class BLE(private val advertiser: BluetoothLeAdvertiser, private val scanner: BluetoothLeScanner, private val context: Context) {
+
+    private var currentHash: ByteArray = ByteArray(16) { _ -> 0 }
+
+    fun setCurrentHash(currentHash: ByteArray) {
+        this.currentHash = currentHash
+    }
 
     object SampleAdvertiseCallback : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
@@ -41,20 +46,19 @@ class BLE(private val advertiser: BluetoothLeAdvertiser) {
             .build()
 
         val data = AdvertiseData.Builder()
-            .setIncludeDeviceName(true)
             .addServiceUuid(ParcelUuid(SERVICE_UUID))
+            // Hash is being truncated -> higher collision probability, but still sufficient for our purpose
+            .addServiceData(ParcelUuid(SERVICE_HASH_DATA_UUID), currentHash)
             .build()
 
         advertiser.stopAdvertising(SampleAdvertiseCallback)
         advertiser.startAdvertising(settings, data, SampleAdvertiseCallback)
+        Log.d(this.javaClass.name, "Started Advertising with hash $currentHash")
     }
 
     @SuppressLint("InlinedApi")
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
-    fun startScan(
-        context: Context,
-        scanner: BluetoothLeScanner,
-    ): PendingIntent? {
+    fun startScan(): PendingIntent? {
         val scanSettings: ScanSettings = ScanSettings.Builder()
             // There are other modes that might work better depending on the use case
             .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
@@ -68,7 +72,7 @@ class BLE(private val advertiser: BluetoothLeAdvertiser) {
         val resultIntent = PendingIntent.getBroadcast(
             context,
             1,
-            Intent(context, BLEScanReceiver::class.java),
+            Intent(context, BLEScanReceiver::class.java).putExtra("currentHash", currentHash),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
         )
 
@@ -84,7 +88,11 @@ class BLE(private val advertiser: BluetoothLeAdvertiser) {
 
     companion object {
         const val ACTUAL_16_BIT_SERVICE_UUID = "b570"
-        val SERVICE_UUID: UUID = UUID.fromString("0000${Companion.ACTUAL_16_BIT_SERVICE_UUID}-0000-1000-8000-00805F9B34FB")
+        const val ACTUAL_16_BIT_CHARACTERISTIC_UUID = "b570"
+        const val ACTUAL_16_BIT_HASH_DATA_UUID = "b571"
+        val SERVICE_UUID: UUID = UUID.fromString("0000${ACTUAL_16_BIT_SERVICE_UUID}-0000-1000-8000-00805F9B34FB")
+        val CHARACTERISTIC_UUID: UUID = UUID.fromString("0000${ACTUAL_16_BIT_CHARACTERISTIC_UUID}-0000-1000-8000-00805F9B34FB")
+        val SERVICE_HASH_DATA_UUID: UUID = UUID.fromString("0000${ACTUAL_16_BIT_HASH_DATA_UUID}-0000-1000-8000-00805F9B34FB")
         val TAG = "BLE_EXPERIMENT_MAIN_ACTIVITY"
         val REQUIRED_PERMISSIONS: Array<String> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) arrayOf(
             Manifest.permission.ACCESS_FINE_LOCATION,

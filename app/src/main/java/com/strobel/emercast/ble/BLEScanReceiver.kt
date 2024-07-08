@@ -6,28 +6,23 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.ParcelUuid
 import android.util.Log
+import com.strobel.emercast.ble.BLE.Companion.SERVICE_HASH_DATA_UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import java.util.UUID
 
 class BLEScanReceiver : BroadcastReceiver() {
 
-    companion object {
-        // Static StateFlow that caches the list of scanned devices used by our sample
-        // This is an **anti-pattern** used for demo purpose and simplicity
-        val devices = MutableStateFlow(emptyList<ScanResult>())
-    }
+    // TODO (Temporarily) Blacklist mac addresses when connection couldn't be established after multiple tries
 
     override fun onReceive(context: Context, intent: Intent) {
-        val results = intent.getScanResults()
-        Log.d("MPB", "Devices found: ${results.size}")
+        val currentHash = intent.getByteArrayExtra("currentHash")
 
-        // Update our results cached list
-        if (results.isNotEmpty()) {
-            devices.update { scanResults ->
-                (scanResults + results).distinctBy { it.device.address }
-            }
-        }
+        val results = intent.getScanResults()
+        val filteredResults = results.filter { x -> x.scanRecord != null && !x.scanRecord?.getServiceData(ParcelUuid(SERVICE_HASH_DATA_UUID)).contentEquals(currentHash) }
+        Log.d(this.javaClass.name, "Total Devices: ${results.size} Filtered Devices: ${filteredResults.size} | CurrentHash: ${currentHash?.toString(Charsets.UTF_8)}")
     }
 
     /**
