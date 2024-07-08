@@ -1,7 +1,10 @@
+import org.openapitools.generator.gradle.plugin.tasks.GenerateTask
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
     id("com.google.gms.google-services")
+    id("org.openapi.generator") version "6.6.0"
 }
 
 android {
@@ -48,6 +51,27 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    sourceSets["main"].java {
+        srcDir("$rootDir/generated/src/main/java")
+    }
+    tasks.preBuild {
+        dependsOn(tasks.withType<GenerateTask>())
+    }
+}
+
+openApiGenerate {
+    generatorName.set("kotlin")
+    outputDir.set("$rootDir/generated")
+    inputSpec.set("$rootDir/api-specs/api-spec.yml")
+    apiPackage.set("com.openapi.gen.android.api")
+    modelPackage.set("com.openapi.gen.android.dto")
+    library.set("jvm-volley")
+    additionalProperties.set(mapOf(
+        "serializationLibrary" to "gson"
+    ))
+    typeMappings.set(mapOf(
+        "string+ObjectId" to "UUID"
+    ))
 }
 
 dependencies {
@@ -63,6 +87,8 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.messaging)
+    implementation(libs.volley)
+    implementation(libs.gson)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -9,11 +9,9 @@ import android.provider.BaseColumns
 class FeedReaderDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
     override fun onCreate(db: SQLiteDatabase) {
-        db.execSQL(SQL_CREATE_ENTRIES)
+        db.execSQL(SQL_CREATE_BROADCAST_MESSAGES)
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // This database is only a cache for online data, so its upgrade policy is
-        // to simply to discard the data and start over
         db.execSQL(SQL_DELETE_ENTRIES)
         onCreate(db)
     }
@@ -26,16 +24,36 @@ class FeedReaderDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
         const val DATABASE_NAME = "FeedReader.db"
 
         object FeedEntry : BaseColumns {
-            const val TABLE_NAME = "entry"
+            const val TABLE_NAME = "BroadcastMessage"
+            const val COLUMN_NAME_ID = "id"
+            const val COLUMN_NAME_CREATED = "created"
+            const val COLUMN_NAME_MODIFIED = "modified"
+            const val COLUMN_NAME_RECEIVED = "received"
+            const val COLUMN_NAME_FORWARD_UNTIL = "forwardUntil"
+            const val COLUMN_NAME_LATITUDE = "latitude"
+            const val COLUMN_NAME_LONGITUDE = "longitude"
+            const val COLUMN_NAME_RADIUS = "radius"
+            const val COLUMN_NAME_CATEGORY = "category"
+            const val COLUMN_NAME_SEVERITY = "severity"
             const val COLUMN_NAME_TITLE = "title"
-            const val COLUMN_NAME_SUBTITLE = "subtitle"
+            const val COLUMN_NAME_MESSAGE = "message"
         }
 
-        private const val SQL_CREATE_ENTRIES =
+        private const val SQL_CREATE_BROADCAST_MESSAGES =
             "CREATE TABLE ${FeedEntry.TABLE_NAME} (" +
                     "${BaseColumns._ID} INTEGER PRIMARY KEY," +
+                    "${FeedEntry.COLUMN_NAME_ID} TEXT," +
+                    "${FeedEntry.COLUMN_NAME_CREATED} INTEGER," +
+                    "${FeedEntry.COLUMN_NAME_MODIFIED} INTEGER," +
+                    "${FeedEntry.COLUMN_NAME_RECEIVED} INTEGER," +
+                    "${FeedEntry.COLUMN_NAME_FORWARD_UNTIL} INTEGER," +
+                    "${FeedEntry.COLUMN_NAME_LATITUDE} REAL," +
+                    "${FeedEntry.COLUMN_NAME_LONGITUDE} REAL," +
+                    "${FeedEntry.COLUMN_NAME_RADIUS} INTEGER," +
+                    "${FeedEntry.COLUMN_NAME_CATEGORY} TEXT," +
+                    "${FeedEntry.COLUMN_NAME_SEVERITY} INTEGER," +
                     "${FeedEntry.COLUMN_NAME_TITLE} TEXT," +
-                    "${FeedEntry.COLUMN_NAME_SUBTITLE} TEXT)"
+                    "${FeedEntry.COLUMN_NAME_MESSAGE} TEXT)"
 
         private const val SQL_DELETE_ENTRIES = "DROP TABLE IF EXISTS ${FeedEntry.TABLE_NAME}"
     }

@@ -1,0 +1,4 @@
+[submodule "api-specs"]
+	path = api-specs
+	url = ../emercast-api.git
+	branch = main
