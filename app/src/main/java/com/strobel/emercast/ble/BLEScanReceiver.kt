@@ -3,9 +3,11 @@ package com.strobel.emercast.ble
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
+import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattServer
 import android.bluetooth.BluetoothGattServerCallback
+import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanResult
@@ -31,6 +33,7 @@ class BLEScanReceiver : BroadcastReceiver() {
 
     // TODO (Temporarily) Blacklist mac addresses when connection couldn't be established after multiple tries
 
+    @SuppressLint("MissingPermission")
     override fun onReceive(context: Context, intent: Intent) {
         val currentHash = intent.getByteArrayExtra("currentHash")
 
@@ -41,13 +44,14 @@ class BLEScanReceiver : BroadcastReceiver() {
         val first = filteredResults.firstOrNull() ?: return
 
         if(currentHash?.toString(Charsets.UTF_8).orEmpty() < first.scanRecord?.getServiceData(ParcelUuid(SERVICE_HASH_DATA_UUID))?.toString(Charsets.UTF_8).orEmpty()) {
+            // Current device should start the GATT server and wait for a connection from the other device
             Log.d(this.javaClass.name, "Hash comparison results in server mode")
             val work = OneTimeWorkRequest.Builder(GattServerWorker::class.java).build()
             WorkManager.getInstance(context).enqueueUniqueWork(GATT_SERVER_WORK_UNIQUE_NAME, ExistingWorkPolicy.KEEP, work)
         } else {
-            Log.d(this.javaClass.name, "Hash comparison results in client mode")
             // Current device should try to connect to the GATT server of  the other device
-            //TODO first.device.connectGatt()
+            Log.d(this.javaClass.name, "Hash comparison results in client mode")
+            first.device.connectGatt(context, false, GattClientCallback(context))
         }
     }
 
@@ -77,12 +81,31 @@ class BLEScanReceiver : BroadcastReceiver() {
         @SuppressLint("MissingPermission")
         override fun doWork(): Result {
             server = manager!!.openGattServer(this.applicationContext, GattServerCallback(this.applicationContext, ::sendResponse))
+            server.addService(service)
 
             Thread.sleep(1000*20)
 
-            // TODO(developer): add long running task here.
             Log.d(this.javaClass.name, "GattServerWorker finished")
             return Result.success()
+        }
+    }
+
+    internal class GattClientCallback(context: Context): BluetoothGattCallback() {
+        private val dbHelper = EmercastDbHelper(context)
+        private val repo = BroadcastMessagesRepository(dbHelper)
+        private val gson = Gson()
+        private val messages = repo.getAllMessages()
+
+        override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+            Log.d(this.javaClass.name, "ConnectionStateChange $status $newState")
+        }
+
+        @SuppressLint("MissingPermission")
+        override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
+            val discoveredService = gatt?.getService(GATT_SERVER_SERVICE_UUID)
+            if(discoveredService == null) return
+            val success = gatt.readCharacteristic(messageToClientCharacteristic)
+            Log.d(this.javaClass.name, "Read Characteristic sucess: $success")
         }
     }
 
@@ -131,9 +154,29 @@ class BLEScanReceiver : BroadcastReceiver() {
 
     companion object {
         const val GATT_SERVER_WORK_UNIQUE_NAME = "GATT_SERVER"
-        const val ACTUAL_16_BIT_NEW_MESSAGE_TO_SERVER_CHARACTERISTIC_UUID = "b572"
-        const val ACTUAL_16_BIT_NEW_MESSAGE_TO_CLIENT_CHARACTERISTIC_UUID = "b573"
+        const val GATT_CLIENT_WORK_UNIQUE_NAME = "GATT_CLIENT"
+        private const val ACTUAL_16_BIT_NEW_MESSAGE_TO_SERVER_CHARACTERISTIC_UUID = "b572"
+        private const val ACTUAL_16_BIT_NEW_MESSAGE_TO_CLIENT_CHARACTERISTIC_UUID = "b573"
+        private const val ACTUAL_16_BIT_GATT_SERVER_SERVICE_UUID = "b580"
         val NEW_MESSAGE_TO_SERVER_CHARACTERISTIC_UUID: UUID = UUID.fromString("0000$ACTUAL_16_BIT_NEW_MESSAGE_TO_SERVER_CHARACTERISTIC_UUID-0000-1000-8000-00805F9B34FB")
         val NEW_MESSAGE_TO_CLIENT_CHARACTERISTIC_UUID: UUID = UUID.fromString("0000$ACTUAL_16_BIT_NEW_MESSAGE_TO_CLIENT_CHARACTERISTIC_UUID-0000-1000-8000-00805F9B34FB")
+        val GATT_SERVER_SERVICE_UUID: UUID = UUID.fromString("0000$ACTUAL_16_BIT_GATT_SERVER_SERVICE_UUID-0000-1000-8000-00805F9B34FB")
+
+        private val messageToServerCharacteristic = BluetoothGattCharacteristic(
+            NEW_MESSAGE_TO_SERVER_CHARACTERISTIC_UUID,
+            BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_READ,
+            BluetoothGattCharacteristic.PERMISSION_WRITE or BluetoothGattCharacteristic.PROPERTY_READ
+        )
+
+        private val messageToClientCharacteristic = BluetoothGattCharacteristic(
+            NEW_MESSAGE_TO_CLIENT_CHARACTERISTIC_UUID,
+            BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_READ,
+            BluetoothGattCharacteristic.PERMISSION_WRITE or BluetoothGattCharacteristic.PROPERTY_READ
+        )
+
+        val service = BluetoothGattService(GATT_SERVER_SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY).also {
+            it.addCharacteristic(messageToServerCharacteristic)
+            it.addCharacteristic(messageToClientCharacteristic)
+        }
     }
 }
