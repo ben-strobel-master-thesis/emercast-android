@@ -16,8 +16,8 @@ import android.os.Build
 import android.os.ParcelUuid
 import android.util.Log
 import androidx.core.content.getSystemService
+import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
-import androidx.work.Operation
 import androidx.work.WorkManager
 import com.strobel.emercast.ble.BLE.Companion.SERVICE_HASH_DATA_UUID
 import androidx.work.Worker
@@ -30,7 +30,6 @@ import java.util.UUID
 class BLEScanReceiver : BroadcastReceiver() {
 
     // TODO (Temporarily) Blacklist mac addresses when connection couldn't be established after multiple tries
-    var currentWork: Operation? = null
 
     override fun onReceive(context: Context, intent: Intent) {
         val currentHash = intent.getByteArrayExtra("currentHash")
@@ -42,14 +41,12 @@ class BLEScanReceiver : BroadcastReceiver() {
         val first = filteredResults.firstOrNull() ?: return
 
         if(currentHash?.toString(Charsets.UTF_8).orEmpty() < first.scanRecord?.getServiceData(ParcelUuid(SERVICE_HASH_DATA_UUID))?.toString(Charsets.UTF_8).orEmpty()) {
-            if(currentWork != null) {
-                if(currentWork?.result?.isDone != true) {
-                    return
-                }
-                val work = OneTimeWorkRequest.Builder(GattServerWorker::class.java).build()
-                currentWork = WorkManager.getInstance(context).beginWith(work).enqueue()
-            }
+            Log.d(this.javaClass.name, "Hash comparison results in server mode")
+            val work = OneTimeWorkRequest.Builder(GattServerWorker::class.java).build()
+            WorkManager.getInstance(context).enqueueUniqueWork(GATT_SERVER_WORK_UNIQUE_NAME, ExistingWorkPolicy.KEEP, work)
         } else {
+            Log.d(this.javaClass.name, "Hash comparison results in client mode")
+            // Current device should try to connect to the GATT server of  the other device
             //TODO first.device.connectGatt()
         }
     }
@@ -73,16 +70,24 @@ class BLEScanReceiver : BroadcastReceiver() {
         private lateinit var server: BluetoothGattServer
 
         @SuppressLint("MissingPermission")
+        fun sendResponse(device: BluetoothDevice, requestId: Int, status: Int, offset: Int, value: ByteArray): Boolean {
+            return server.sendResponse(device, requestId, status, offset, value)
+        }
+
+        @SuppressLint("MissingPermission")
         override fun doWork(): Result {
-            server = manager!!.openGattServer(this.applicationContext, GattServerCallback(this.applicationContext, server))
+            server = manager!!.openGattServer(this.applicationContext, GattServerCallback(this.applicationContext, ::sendResponse))
+
+            Thread.sleep(1000*20)
 
             // TODO(developer): add long running task here.
+            Log.d(this.javaClass.name, "GattServerWorker finished")
             return Result.success()
         }
     }
 
     // TODO https://github.com/android/platform-samples/blob/main/samples/connectivity/bluetooth/ble/src/main/java/com/example/platform/connectivity/bluetooth/ble/server/GATTServerSampleService.kt#L114
-    internal class GattServerCallback(context: Context, val server: BluetoothGattServer): BluetoothGattServerCallback() {
+    internal class GattServerCallback(context: Context, private val sendResponse: (BluetoothDevice, Int, Int, Int, ByteArray) -> Boolean): BluetoothGattServerCallback() {
         private val dbHelper = EmercastDbHelper(context)
         private val repo = BroadcastMessagesRepository(dbHelper)
         private val gson = Gson()
@@ -117,14 +122,15 @@ class BLEScanReceiver : BroadcastReceiver() {
         ) {
             super.onCharacteristicReadRequest(device, requestId, offset, characteristic)
             if(requestId >= messages.size) {
-                server.sendResponse(device, requestId, BluetoothGatt.GATT_READ_NOT_PERMITTED, offset, ByteArray(0))
+                sendResponse(device!!, requestId, BluetoothGatt.GATT_READ_NOT_PERMITTED, offset, ByteArray(0))
                 return
             }
-            server.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, gson.toJson(messages[requestId]).toByteArray())
+            sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, gson.toJson(messages[requestId]).toByteArray())
         }
     }
 
     companion object {
+        const val GATT_SERVER_WORK_UNIQUE_NAME = "GATT_SERVER"
         const val ACTUAL_16_BIT_NEW_MESSAGE_TO_SERVER_CHARACTERISTIC_UUID = "b572"
         const val ACTUAL_16_BIT_NEW_MESSAGE_TO_CLIENT_CHARACTERISTIC_UUID = "b573"
         val NEW_MESSAGE_TO_SERVER_CHARACTERISTIC_UUID: UUID = UUID.fromString("0000$ACTUAL_16_BIT_NEW_MESSAGE_TO_SERVER_CHARACTERISTIC_UUID-0000-1000-8000-00805F9B34FB")
