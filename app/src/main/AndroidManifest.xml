@@ -44,10 +44,13 @@
         </service>
 
         <service
-            android:name=".ble.BLEAdvertiserService"/>
+            android:name=".ble.BLEAdvertiserService"
+            android:exported="false"
+            android:enabled="true"/>
 
         <receiver
             android:name=".ble.BLEScanReceiver"
+            android:enabled="true"
             android:exported="false" />
 
         <receiver

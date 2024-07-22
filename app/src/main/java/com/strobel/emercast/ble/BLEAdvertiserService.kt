@@ -91,7 +91,7 @@ class BLEAdvertiserService: Service() {
 
         advertiser?.stopAdvertising(SampleAdvertiseCallback)
         advertiser?.startAdvertising(settings, data, SampleAdvertiseCallback)
-        Log.d(this.javaClass.name, "Started Advertising with hash $currentHash")
+        Log.d(this.javaClass.name, "Started Advertising with hash ${currentHash.toString(Charsets.UTF_8)}")
     }
 
     @SuppressLint("InlinedApi")
@@ -122,6 +122,7 @@ class BLEAdvertiserService: Service() {
                 .build(),
         )
         scanner?.startScan(scanFilters, scanSettings, resultIntent)
+        Log.d(this.javaClass.name, "Started Scanning")
         return resultIntent
     }
 
@@ -178,16 +179,7 @@ class BLEAdvertiserService: Service() {
             val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
             val adapter = bluetoothManager.adapter
             if(adapter == null || !adapter.isEnabled) {
-                Log.d("startServiceOrRequestBluetoothStart", "Bluetooth is not enabled, requesting...")
-                if (ActivityCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.BLUETOOTH_CONNECT
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    Log.d("startServiceOrRequestBluetoothStart", "Permission for requesting to enable bluetooth not granted, aborting...")
-                    return
-                }
-                context.startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+                Log.d("startServiceOrRequestBluetoothStart", "Bluetooth is not enabled, aborting...")
             } else {
                 Log.d("startServiceOrRequestBluetoothStart", "Bluetooth is enabled are granted, starting BLEAdvertiserService...")
                 context.startService(Intent(context, BLEAdvertiserService::class.java))

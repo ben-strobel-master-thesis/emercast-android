@@ -41,7 +41,6 @@ class BLEScanReceiver : BroadcastReceiver() {
     // TODO (Temporarily) Blacklist mac addresses when connection couldn't be established after multiple tries
 
     override fun onReceive(context: Context, intent: Intent) {
-        val manager: BluetoothManager? = context.getSystemService()!!
         val currentHash = intent.getByteArrayExtra("currentHash")
 
         if (ActivityCompat.checkSelfPermission(
@@ -56,6 +55,7 @@ class BLEScanReceiver : BroadcastReceiver() {
         val results = intent.getScanResults()
         val filteredResults = results.filter { x -> x.scanRecord != null && !x.scanRecord?.getServiceData(ParcelUuid(SERVICE_HASH_DATA_UUID)).contentEquals(currentHash) }
         Log.d(this.javaClass.name, "Total Devices: ${results.size} Filtered Devices: ${filteredResults.size} | CurrentHash: ${currentHash?.toString(Charsets.UTF_8)}")
+        filteredResults.forEach {r -> Log.d(this.javaClass.name, "Found device ${r.device.name} at ${r.device.address} of type ${r.device.type} with bondState ${r.device.bondState}. Connectable: ${r.isConnectable}")}
 
         val first = filteredResults.firstOrNull() ?: return
 
@@ -95,8 +95,10 @@ class BLEScanReceiver : BroadcastReceiver() {
         @SuppressLint("MissingPermission")
         override fun doWork(): Result {
             val deviceAddress = inputData.getString("mac")
-            val device = manager!!.adapter.getRemoteDevice(deviceAddress)
-            gatt = device.connectGatt(appContext, false, GattClientCallback(appContext), BluetoothDevice.TRANSPORT_LE)
+            val device = manager!!.adapter.getRemoteDevice("76:42:41:52:32:AA")
+            Log.d(this.javaClass.name, "Connecting to device ${device.name} at ${device.address} of type ${device.type} with bondState ${device.bondState}")
+            gatt = device.connectGatt(appContext, false, GattClientCallback(appContext), BluetoothDevice.TRANSPORT_AUTO)
+            Log.d(this.javaClass.name, "Connect initialized")
             /*if(first.device.type == BluetoothDevice.DEVICE_TYPE_UNKNOWN) {
                 Log.d(this.javaClass.name, "BLE device cache is stale, need to rescan")
                 val macFilter = ScanFilter.Builder().setDeviceAddress(first.device.address).build()
@@ -122,6 +124,7 @@ class BLEScanReceiver : BroadcastReceiver() {
             Thread.sleep(1000*15)
 
             Log.d(this.javaClass.name, "GattClientWorker finished")
+            gatt?.disconnect()
             gatt?.close()
             return Result.success()
         }
@@ -129,6 +132,7 @@ class BLEScanReceiver : BroadcastReceiver() {
         @SuppressLint("MissingPermission")
         override fun onStopped() {
             super.onStopped()
+            gatt?.disconnect()
             gatt?.close()
         }
     }
@@ -200,6 +204,7 @@ class BLEScanReceiver : BroadcastReceiver() {
                 gatt.discoverServices()
                 Log.d(this.javaClass.name, "Discovering services...")
             } else {
+                gatt.disconnect()
                 gatt.close()
             }
         }

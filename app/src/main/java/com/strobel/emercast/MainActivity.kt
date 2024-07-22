@@ -66,6 +66,7 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "Bluetooth is disabled. Enable it and restart the app", Toast.LENGTH_LONG)
                 .show()
         }
+        BLEAdvertiserService.startServiceOrRequestBluetoothStart(this.applicationContext)
         Intent(this, BLEAdvertiserService::class.java).also { intent ->
             run {
                 val res = applicationContext.bindService(
