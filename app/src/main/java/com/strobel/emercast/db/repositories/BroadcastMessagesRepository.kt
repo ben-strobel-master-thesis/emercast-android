@@ -4,8 +4,9 @@ import android.content.ContentValues
 import android.provider.BaseColumns
 import com.strobel.emercast.db.EmercastDbHelper
 import com.strobel.emercast.db.models.BroadcastMessage
+import java.security.MessageDigest
 
-class BroadcastMessagesRepository(val dbHelper: EmercastDbHelper) {
+class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
 
     fun newRow(
         id: String,
@@ -87,5 +88,29 @@ class BroadcastMessagesRepository(val dbHelper: EmercastDbHelper) {
         }
         cursor.close()
         return messages
+    }
+
+    fun calculateMessagesHash(): ByteArray {
+        val builder = StringBuilder()
+        val messages = getAllMessages()
+
+        // Messages are already orderd by created timestamp (from repo)
+        messages.forEach{ m ->
+            builder.append(m.id)
+            builder.append(m.created)
+            builder.append(m.modified)
+            builder.append(m.forwardUntil)
+            builder.append(m.latitude)
+            builder.append(m.longitude)
+            builder.append(m.radius)
+            builder.append(m.category)
+            builder.append(m.severity)
+            builder.append(m.title)
+            builder.append(m.content)
+        }
+
+        val md = MessageDigest.getInstance("SHA-256")
+        val hash = md.digest(builder.toString().toByteArray(Charsets.UTF_8))
+        return hash.asList().subList(0, 16).toByteArray();
     }
 }

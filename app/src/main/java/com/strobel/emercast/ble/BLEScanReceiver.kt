@@ -23,7 +23,7 @@ import androidx.core.content.getSystemService
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
-import com.strobel.emercast.ble.BLE.Companion.SERVICE_HASH_DATA_UUID
+import com.strobel.emercast.ble.BLEAdvertiserService.Companion.SERVICE_HASH_DATA_UUID
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.google.gson.Gson

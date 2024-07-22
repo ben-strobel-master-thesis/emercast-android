@@ -8,7 +8,7 @@ import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
 import com.strobel.emercast.db.EmercastDbHelper
 
 // https://firebase.google.com/docs/cloud-messaging/android/receive
-class MessagingReceiverService : FirebaseMessagingService() {
+class FCMService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         Log.d(this.javaClass.name, "Message Received: " + message.messageId + " " + message.data)

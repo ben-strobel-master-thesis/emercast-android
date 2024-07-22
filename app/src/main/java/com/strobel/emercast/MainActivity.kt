@@ -2,14 +2,16 @@ package com.strobel.emercast
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothManager
-import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.IBinder
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -20,7 +22,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
-import com.strobel.emercast.ble.BLE
+import com.strobel.emercast.ble.BLEAdvertiserService
+import com.strobel.emercast.ble.BLEAdvertiserService.Companion.hasPermissions
 import com.strobel.emercast.db.EmercastDbHelper
 import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
 import com.strobel.emercast.ui.theme.EmercastTheme
@@ -29,19 +32,9 @@ import com.strobel.emercast.views.MessageListViewModel
 
 class MainActivity : ComponentActivity() {
     private val manager: BluetoothManager? get() = applicationContext.getSystemService()!!
-    private val advertiser: BluetoothLeAdvertiser? get() = manager?.adapter?.bluetoothLeAdvertiser
-    private var ble: BLE? = null
+    private var bleAdvertiserService: BLEAdvertiserService? = null
     private var newBroadcastMessageReceiver: BroadcastReceiver? = null
     private var viewModel: MessageListViewModel? = null
-
-    private fun hasPermissions(): Boolean {
-        for (permission in BLE.REQUIRED_PERMISSIONS) {
-            if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
-                return false
-            }
-        }
-        return true
-    }
 
     @SuppressLint("MissingPermission") // Is check with hasPermissions
     override fun onStart() {
@@ -53,26 +46,16 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        val scanner = manager?.adapter?.bluetoothLeScanner
-        if(scanner == null) {
-            Toast.makeText(this, "Bluetooth Scanner not found", Toast.LENGTH_LONG)
-                .show()
-            return
-        }
-        else {
-            ble = BLE(advertiser!!, scanner, this)
-            viewModel?.setBLE(ble!!)
-        }
         val requestPermissionLauncher =
             registerForActivityResult(
                 ActivityResultContracts.RequestMultiplePermissions()
             ) { isGranted: Map<String, Boolean> ->
                 val notGranted = isGranted.entries.filter { e -> !e.value }
                 if (notGranted.isEmpty()) {
-                    Log.i(BLE.TAG, "Permissions granted")
+                    Log.i(this.javaClass.name, "Permissions granted")
                     recreate()
                 } else {
-                    Log.i(BLE.TAG, "Permissions NOT granted: $notGranted")
+                    Log.i(this.javaClass.name, "Permissions NOT granted: $notGranted")
                     Toast.makeText(this, "Cannot start without required permissions", Toast.LENGTH_LONG)
                         .show()
                     finish()
@@ -80,13 +63,15 @@ class MainActivity : ComponentActivity() {
             }
         askNotificationPermission()
         when {
-            hasPermissions() -> {
+            hasPermissions(this.applicationContext) -> {
                 // Bluetooth needs to be on, otherwise this will fail, should be properly communicated in actual app
-                ble?.startScan()
-                ble?.startAdvertising()
+                Log.d(this.javaClass.name, "App has required permissions, binding service...")
+                BLEAdvertiserService.startServiceOrRequestBluetoothStart(this.applicationContext)
+                bindService(intent, bleServiceConnection, Context.BIND_AUTO_CREATE)
             }
             else -> {
-                requestPermissionLauncher.launch(BLE.REQUIRED_PERMISSIONS)
+                Log.d(this.javaClass.name, "App doesn't have required permissions, requesting permissions...")
+                requestPermissionLauncher.launch(BLEAdvertiserService.REQUIRED_PERMISSIONS)
             }
         }
 
@@ -140,6 +125,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
+        unbindService(bleServiceConnection)
         if(newBroadcastMessageReceiver != null) {
             applicationContext.unregisterReceiver(newBroadcastMessageReceiver)
         }
@@ -173,5 +159,30 @@ class MainActivity : ComponentActivity() {
                 requestPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
             }
         }
+    }
+
+    private val bleServiceConnection = object : ServiceConnection {
+        override fun onServiceConnected(className: ComponentName?, service: IBinder?) {
+            val binder = service as BLEAdvertiserService.LocalBinder
+            val boundService = binder.getService()
+            bleAdvertiserService = boundService
+            viewModel?.setBLE(boundService)
+        }
+
+        override fun onServiceDisconnected(className: ComponentName?) {
+            bleAdvertiserService = null
+            viewModel?.setBLE(null)
+        }
+
+        override fun onBindingDied(name: ComponentName?) {
+            super.onBindingDied(name)
+            Log.d(this.javaClass.name, "onBindingDied $name")
+        }
+
+        override fun onNullBinding(name: ComponentName?) {
+            super.onNullBinding(name)
+            Log.d(this.javaClass.name, "onNullBinding $name")
+        }
+
     }
 }
