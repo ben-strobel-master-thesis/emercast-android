@@ -44,8 +44,7 @@
         </service>
 
         <service
-            android:name=".ble.BLEAdvertiserService"
-            android:exported="false"/>
+            android:name=".ble.BLEAdvertiserService"/>
 
         <receiver
             android:name=".ble.BLEScanReceiver"

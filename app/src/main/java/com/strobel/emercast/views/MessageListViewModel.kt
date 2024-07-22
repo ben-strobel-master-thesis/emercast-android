@@ -3,6 +3,7 @@ package com.strobel.emercast.views
 import android.annotation.SuppressLint
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
+import androidx.core.util.Consumer
 import androidx.lifecycle.ViewModel
 import com.strobel.emercast.ble.BLEAdvertiserService
 import com.strobel.emercast.db.models.BroadcastMessage
@@ -10,10 +11,10 @@ import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
 
 class MessageListViewModel(private val repo: BroadcastMessagesRepository): ViewModel() {
     val messageList = mutableStateListOf<BroadcastMessage>()
-    var bleAdvertiserService: BLEAdvertiserService? = null
+    private var setCurrentHash: Consumer<ByteArray>? = null
 
-    fun setBLE(bleAdvertiserService: BLEAdvertiserService?) {
-        this.bleAdvertiserService = bleAdvertiserService;
+    fun setCallback(callback: Consumer<ByteArray>?) {
+        this.setCurrentHash = callback;
         updateBLEMessagesHash()
     }
 
@@ -27,10 +28,8 @@ class MessageListViewModel(private val repo: BroadcastMessagesRepository): ViewM
 
     @SuppressLint("MissingPermission")
     private fun updateBLEMessagesHash() {
-        if(bleAdvertiserService != null) {
-            bleAdvertiserService?.setCurrentHash(repo.calculateMessagesHash())
-            bleAdvertiserService?.startAdvertising()
-            bleAdvertiserService?.startScan()
+        if(setCurrentHash != null) {
+            setCurrentHash?.accept(repo.calculateMessagesHash())
         }
     }
 

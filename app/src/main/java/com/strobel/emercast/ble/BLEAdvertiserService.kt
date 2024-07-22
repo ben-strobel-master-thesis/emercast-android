@@ -139,7 +139,7 @@ class BLEAdvertiserService: Service() {
         fun getService(): BLEAdvertiserService = this@BLEAdvertiserService
     }
 
-    override fun onBind(p0: Intent?): IBinder? {
+    override fun onBind(intent: Intent?): IBinder {
         return binder
     }
 
@@ -149,7 +149,13 @@ class BLEAdvertiserService: Service() {
         val SERVICE_UUID: UUID = UUID.fromString("0000${ACTUAL_16_BIT_SERVICE_UUID}-0000-1000-8000-00805F9B34FB")
         val SERVICE_HASH_DATA_UUID: UUID = UUID.fromString("0000${ACTUAL_16_BIT_HASH_DATA_UUID}-0000-1000-8000-00805F9B34FB")
         val TAG = "BLEAdvertiserService"
-        val REQUIRED_PERMISSIONS: Array<String> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) arrayOf(
+        val REQUIRED_PERMISSIONS: Array<String> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_ADVERTISE,
+            Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) arrayOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.BLUETOOTH_SCAN,
             Manifest.permission.BLUETOOTH_ADVERTISE,

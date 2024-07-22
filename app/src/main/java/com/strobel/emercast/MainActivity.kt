@@ -40,12 +40,6 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
 
-        if(manager?.adapter != null && !manager!!.adapter.isEnabled){
-            Toast.makeText(this, "Bluetooth is disabled. Enable it and restart the app", Toast.LENGTH_LONG)
-                .show()
-            return
-        }
-
         val requestPermissionLauncher =
             registerForActivityResult(
                 ActivityResultContracts.RequestMultiplePermissions()
@@ -61,17 +55,25 @@ class MainActivity : ComponentActivity() {
                     finish()
                 }
             }
-        askNotificationPermission()
-        when {
-            hasPermissions(this.applicationContext) -> {
-                // Bluetooth needs to be on, otherwise this will fail, should be properly communicated in actual app
-                Log.d(this.javaClass.name, "App has required permissions, binding service...")
-                BLEAdvertiserService.startServiceOrRequestBluetoothStart(this.applicationContext)
-                bindService(intent, bleServiceConnection, Context.BIND_AUTO_CREATE)
-            }
-            else -> {
-                Log.d(this.javaClass.name, "App doesn't have required permissions, requesting permissions...")
-                requestPermissionLauncher.launch(BLEAdvertiserService.REQUIRED_PERMISSIONS)
+        if(!hasPermissions(this.applicationContext)) {
+            Log.d(this.javaClass.name, "App doesn't have required permissions, requesting permissions...")
+            requestPermissionLauncher.launch(BLEAdvertiserService.REQUIRED_PERMISSIONS)
+            return
+        }
+        // Bluetooth needs to be on, otherwise this will fail, should be properly communicated in actual app
+        Log.d(this.javaClass.name, "App has required permissions, binding service...")
+        if(manager?.adapter != null && !manager!!.adapter.isEnabled){
+            Toast.makeText(this, "Bluetooth is disabled. Enable it and restart the app", Toast.LENGTH_LONG)
+                .show()
+        }
+        Intent(this, BLEAdvertiserService::class.java).also { intent ->
+            run {
+                val res = applicationContext.bindService(
+                    intent,
+                    bleServiceConnection,
+                    Context.BIND_AUTO_CREATE
+                )
+                Log.d(this.javaClass.name, "bindService res: $res")
             }
         }
 
@@ -125,7 +127,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        unbindService(bleServiceConnection)
+        try {
+            unbindService(bleServiceConnection)
+        } catch (_: Exception){}
         if(newBroadcastMessageReceiver != null) {
             applicationContext.unregisterReceiver(newBroadcastMessageReceiver)
         }
@@ -142,36 +146,24 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun askNotificationPermission() {
-        // This is only necessary for API level >= 33 (TIRAMISU)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) ==
-                PackageManager.PERMISSION_GRANTED
-            ) {
-                // FCM SDK (and your app) can post notifications.
-            } else if (shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS)) {
-                // TODO: display an educational UI explaining to the user the features that will be enabled
-                //       by them granting the POST_NOTIFICATION permission. This UI should provide the user
-                //       "OK" and "No thanks" buttons. If the user selects "OK," directly request the permission.
-                //       If the user selects "No thanks," allow the user to continue without notifications.
-            } else {
-                // Directly ask for the permission
-                requestPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-    }
-
     private val bleServiceConnection = object : ServiceConnection {
+        @SuppressLint("MissingPermission")
         override fun onServiceConnected(className: ComponentName?, service: IBinder?) {
             val binder = service as BLEAdvertiserService.LocalBinder
             val boundService = binder.getService()
             bleAdvertiserService = boundService
-            viewModel?.setBLE(boundService)
+            viewModel?.setCallback { hash ->
+                run {
+                    boundService.setCurrentHash(hash)
+                    boundService.startAdvertising()
+                    boundService.startScan()
+                }
+            }
         }
 
         override fun onServiceDisconnected(className: ComponentName?) {
             bleAdvertiserService = null
-            viewModel?.setBLE(null)
+            viewModel?.setCallback(null)
         }
 
         override fun onBindingDied(name: ComponentName?) {

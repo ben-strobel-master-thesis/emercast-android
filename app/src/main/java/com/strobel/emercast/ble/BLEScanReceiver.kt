@@ -1,6 +1,7 @@
 package com.strobel.emercast.ble
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
@@ -10,7 +11,10 @@ import android.bluetooth.BluetoothGattServerCallback
 import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -20,6 +24,7 @@ import android.os.ParcelUuid
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.getSystemService
+import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
@@ -62,7 +67,10 @@ class BLEScanReceiver : BroadcastReceiver() {
         } else {
             // Current device should try to connect to the GATT server of  the other device
             Log.d(this.javaClass.name, "Hash comparison results in client mode")
-            first.device.connectGatt(context, false, GattClientCallback(context))
+            val inputData = Data.Builder()
+            inputData.putString("mac", first.device.address)
+            val work = OneTimeWorkRequest.Builder(GattClientWorker::class.java).setInputData(inputData.build()).build()
+            WorkManager.getInstance(context).enqueueUniqueWork(GATT_CLIENT_WORK_UNIQUE_NAME, ExistingWorkPolicy.KEEP, work)
         }
     }
 
@@ -80,7 +88,52 @@ class BLEScanReceiver : BroadcastReceiver() {
             getParcelableArrayListExtra(BluetoothLeScanner.EXTRA_LIST_SCAN_RESULT)
         } ?: emptyList()
 
-    internal class GattServerWorker(val appContext: Context, workerParams: WorkerParameters) : Worker(appContext, workerParams) {
+    internal class GattClientWorker(private val appContext: Context, workerParams: WorkerParameters): Worker(appContext, workerParams) {
+        private val manager: BluetoothManager? get() = applicationContext.getSystemService()!!
+        private var gatt: BluetoothGatt? = null
+
+        @SuppressLint("MissingPermission")
+        override fun doWork(): Result {
+            val deviceAddress = inputData.getString("mac")
+            val device = manager!!.adapter.getRemoteDevice(deviceAddress)
+            gatt = device.connectGatt(appContext, false, GattClientCallback(appContext), BluetoothDevice.TRANSPORT_LE)
+            /*if(first.device.type == BluetoothDevice.DEVICE_TYPE_UNKNOWN) {
+                Log.d(this.javaClass.name, "BLE device cache is stale, need to rescan")
+                val macFilter = ScanFilter.Builder().setDeviceAddress(first.device.address).build()
+                val scanSettings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
+
+                val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+                bluetoothManager.adapter.bluetoothLeScanner.startScan(listOf(macFilter), scanSettings, object : ScanCallback() {
+                    @SuppressLint("MissingPermission")
+                    override fun onScanResult(callbackType: Int, result: ScanResult) {
+                        Log.d(this.javaClass.name, "Found second stage scan results")
+                        with(result.device) {
+                            Log.d(this.javaClass.name, "Type of found device: ${result.device.type}")
+                            result.device.connectGatt(context, false, GattClientCallback(context), BluetoothDevice.TRANSPORT_LE)
+                        }
+                    }
+
+                    override fun onScanFailed(errorCode: Int) {
+                        Log.d(this.javaClass.name, "onScanFailed: code $errorCode")
+                    }
+                })
+            }*/
+
+            Thread.sleep(1000*15)
+
+            Log.d(this.javaClass.name, "GattClientWorker finished")
+            gatt?.close()
+            return Result.success()
+        }
+
+        @SuppressLint("MissingPermission")
+        override fun onStopped() {
+            super.onStopped()
+            gatt?.close()
+        }
+    }
+
+    internal class GattServerWorker(private val appContext: Context, workerParams: WorkerParameters) : Worker(appContext, workerParams) {
         private val manager: BluetoothManager? get() = applicationContext.getSystemService()!!
         private lateinit var server: BluetoothGattServer
 
@@ -106,14 +159,21 @@ class BLEScanReceiver : BroadcastReceiver() {
                 return Result.failure()
             }
 
-            Log.d(this.javaClass.name, "${this.applicationContext} ")
+            Log.d(this.javaClass.name, "${this.applicationContext}")
             server = manager!!.openGattServer(this.applicationContext, GattServerCallback(this.applicationContext, ::sendResponse))
             server.addService(service)
 
             Thread.sleep(1000*20)
 
             Log.d(this.javaClass.name, "GattServerWorker finished")
+            server.close()
             return Result.success()
+        }
+
+        @SuppressLint("MissingPermission")
+        override fun onStopped() {
+            super.onStopped()
+            server.close()
         }
     }
 
@@ -139,6 +199,8 @@ class BLEScanReceiver : BroadcastReceiver() {
             if(status == 0) {
                 gatt.discoverServices()
                 Log.d(this.javaClass.name, "Discovering services...")
+            } else {
+                gatt.close()
             }
         }
 
