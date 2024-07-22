@@ -62,15 +62,7 @@ class BLEScanReceiver : BroadcastReceiver() {
         } else {
             // Current device should try to connect to the GATT server of  the other device
             Log.d(this.javaClass.name, "Hash comparison results in client mode")
-            Log.d(this.javaClass.name, "Device bond state: ${first.device.bondState}")
-            if(first.device.bondState == BluetoothDevice.BOND_NONE) {
-                first.device.createBond()
-                Log.d(this.javaClass.name, "Creating bond")
-            } else {
-                val gatt = first.device.connectGatt(context, false, GattClientCallback(context))
-                val success = gatt.connect()
-                Log.d(this.javaClass.name, "Success: $success")
-            }
+            first.device.connectGatt(context, false, GattClientCallback(context))
         }
     }
 
@@ -125,7 +117,7 @@ class BLEScanReceiver : BroadcastReceiver() {
         }
     }
 
-    internal class GattClientCallback(val context: Context): BluetoothGattCallback() {
+    internal class GattClientCallback(private val context: Context): BluetoothGattCallback() {
         private val dbHelper = EmercastDbHelper(context)
         private val repo = BroadcastMessagesRepository(dbHelper)
         private val gson = Gson()
@@ -171,11 +163,11 @@ class BLEScanReceiver : BroadcastReceiver() {
     }
 
     // TODO https://github.com/android/platform-samples/blob/main/samples/connectivity/bluetooth/ble/src/main/java/com/example/platform/connectivity/bluetooth/ble/server/GATTServerSampleService.kt#L114
-    internal class GattServerCallback(val context: Context, private val sendResponse: (BluetoothDevice, Int, Int, Int, ByteArray) -> Boolean): BluetoothGattServerCallback() {
+    internal class GattServerCallback(private val context: Context, private val sendResponse: (BluetoothDevice, Int, Int, Int, ByteArray) -> Boolean): BluetoothGattServerCallback() {
         private val dbHelper = EmercastDbHelper(context)
         private val repo = BroadcastMessagesRepository(dbHelper)
-        private val gson = Gson()
-        private val messages = repo.getAllMessages()
+        // private val gson = Gson()
+        // private val messages = repo.getAllMessages()
 
         override fun onConnectionStateChange(
             device: BluetoothDevice,
