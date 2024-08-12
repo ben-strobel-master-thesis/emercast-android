@@ -79,13 +79,12 @@ class BLEAdvertiserService: Service() {
         val settings = AdvertiseSettings.Builder()
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
-            .setConnectable(true)
             .setTimeout(0)
             .build()
 
         val data = AdvertiseData.Builder()
             .addServiceUuid(ParcelUuid(SERVICE_UUID))
-            // Hash is being truncated -> higher collision probability, but still sufficient for our purpose
+            // Hash is being truncated -> higher collision probability, but rather more false positives than false negatives -> false positives will be resolved on connection
             .addServiceData(ParcelUuid(SERVICE_HASH_DATA_UUID), currentHash)
             .build()
 
@@ -98,11 +97,9 @@ class BLEAdvertiserService: Service() {
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     fun startScan(): PendingIntent? {
         val scanSettings: ScanSettings = ScanSettings.Builder()
-            // There are other modes that might work better depending on the use case
             .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
             // If not set the results will be batch while the screen is off till the screen is turned on again
-            .setReportDelay(3000)
-            // Use balanced, when in background it will be switched to low power
+            // .setReportDelay(3000)
             .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
             .build()
 
