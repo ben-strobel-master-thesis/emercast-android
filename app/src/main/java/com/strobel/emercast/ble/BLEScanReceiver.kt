@@ -107,10 +107,5 @@ class BLEScanReceiver : BroadcastReceiver() {
         const val GATT_CLIENT_WORK_UNIQUE_NAME = "GATT_CLIENT"
         private const val ACTUAL_16_BIT_GATT_SERVER_SERVICE_UUID = "b580"
         val GATT_SERVER_SERVICE_UUID: UUID = UUID.fromString("0000$ACTUAL_16_BIT_GATT_SERVER_SERVICE_UUID-0000-1000-8000-00805F9B34FB")
-
-        val service = BluetoothGattService(GATT_SERVER_SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY).also {
-            it.addCharacteristic(GattServerWorker.messageToServerCharacteristic)
-            it.addCharacteristic(GattServerWorker.messageToClientCharacteristic)
-        }
     }
 }

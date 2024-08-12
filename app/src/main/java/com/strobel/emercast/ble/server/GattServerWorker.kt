@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattServer
+import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.util.Log
@@ -11,7 +12,7 @@ import androidx.core.content.getSystemService
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.strobel.emercast.GlobalInMemoryAppStateSingleton
-import com.strobel.emercast.ble.BLEScanReceiver.Companion.service
+import com.strobel.emercast.ble.BLEScanReceiver.Companion.GATT_SERVER_SERVICE_UUID
 import com.strobel.emercast.ble.enums.GattRoleEnum
 import java.util.UUID
 
@@ -52,16 +53,21 @@ class GattServerWorker(private val appContext: Context, workerParams: WorkerPara
         val NEW_MESSAGE_TO_SERVER_CHARACTERISTIC_UUID: UUID = UUID.fromString("0000$ACTUAL_16_BIT_NEW_MESSAGE_TO_SERVER_CHARACTERISTIC_UUID-0000-1000-8000-00805F9B34FB")
         val NEW_MESSAGE_TO_CLIENT_CHARACTERISTIC_UUID: UUID = UUID.fromString("0000$ACTUAL_16_BIT_NEW_MESSAGE_TO_CLIENT_CHARACTERISTIC_UUID-0000-1000-8000-00805F9B34FB")
 
-        val messageToServerCharacteristic = BluetoothGattCharacteristic(
+        private val messageToServerCharacteristic = BluetoothGattCharacteristic(
             NEW_MESSAGE_TO_SERVER_CHARACTERISTIC_UUID,
             BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_READ,
             BluetoothGattCharacteristic.PERMISSION_WRITE or BluetoothGattCharacteristic.PROPERTY_READ
         )
 
-        val messageToClientCharacteristic = BluetoothGattCharacteristic(
+        private val messageToClientCharacteristic = BluetoothGattCharacteristic(
             NEW_MESSAGE_TO_CLIENT_CHARACTERISTIC_UUID,
             BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_READ,
             BluetoothGattCharacteristic.PERMISSION_WRITE or BluetoothGattCharacteristic.PROPERTY_READ
         )
+
+        private val service = BluetoothGattService(GATT_SERVER_SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY).also {
+            it.addCharacteristic(messageToServerCharacteristic)
+            it.addCharacteristic(messageToClientCharacteristic)
+        }
     }
 }

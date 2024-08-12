@@ -3,6 +3,7 @@ package com.strobel.emercast.ble.client
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
+import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.util.Log
@@ -39,10 +40,29 @@ class GattClientCallback(context: Context): BluetoothGattCallback() {
         super.onServicesDiscovered(gatt, status)
 
         Log.d(this.javaClass.name, "onServicesDiscovered")
-        val discoveredService = gatt?.getService(GATT_SERVER_SERVICE_UUID)
-        if(discoveredService == null) return
+        gatt?.services?.forEach { service ->
+            run {
+                Log.d(this.javaClass.name, "Service: ${service.uuid}")
+                service.characteristics.forEach { characteristic ->
+                    Log.d(this.javaClass.name,"Characteristic: ${characteristic.uuid}"
+                    )
+                }
+            }
+        }
+        val discoveredService = gatt?.getService(GATT_SERVER_SERVICE_UUID) ?: return
         Log.d(this.javaClass.name, "Own service not null")
-        val success = gatt.readCharacteristic(GattServerWorker.messageToClientCharacteristic)
+        val characteristic = discoveredService.getCharacteristic(GattServerWorker.NEW_MESSAGE_TO_CLIENT_CHARACTERISTIC_UUID)
+        val success = gatt.readCharacteristic(characteristic)
         Log.d(this.javaClass.name, "Read Characteristic sucess: $success")
+    }
+
+    override fun onCharacteristicRead(
+        gatt: BluetoothGatt,
+        characteristic: BluetoothGattCharacteristic,
+        value: ByteArray,
+        status: Int,
+    ) {
+        super.onCharacteristicRead(gatt, characteristic, value, status)
+        Log.d(this.javaClass.name, "onCharacteristicRead ${value.decodeToString()}")
     }
 }
