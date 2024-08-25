@@ -56,13 +56,13 @@ class GattServerWorker(private val appContext: Context, workerParams: WorkerPara
         private val messageToServerCharacteristic = BluetoothGattCharacteristic(
             NEW_MESSAGE_TO_SERVER_CHARACTERISTIC_UUID,
             BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_READ,
-            BluetoothGattCharacteristic.PERMISSION_WRITE or BluetoothGattCharacteristic.PROPERTY_READ
+            BluetoothGattCharacteristic.PERMISSION_WRITE or BluetoothGattCharacteristic.PERMISSION_READ
         )
 
         private val messageToClientCharacteristic = BluetoothGattCharacteristic(
             NEW_MESSAGE_TO_CLIENT_CHARACTERISTIC_UUID,
             BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_READ,
-            BluetoothGattCharacteristic.PERMISSION_WRITE or BluetoothGattCharacteristic.PROPERTY_READ
+            BluetoothGattCharacteristic.PERMISSION_WRITE or BluetoothGattCharacteristic.PERMISSION_READ
         )
 
         private val service = BluetoothGattService(GATT_SERVER_SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY).also {
