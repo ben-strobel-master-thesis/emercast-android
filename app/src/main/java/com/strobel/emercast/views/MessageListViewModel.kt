@@ -5,7 +5,6 @@ import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.core.util.Consumer
 import androidx.lifecycle.ViewModel
-import com.strobel.emercast.ble.BLEAdvertiserService
 import com.strobel.emercast.db.models.BroadcastMessage
 import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
 
@@ -21,7 +20,7 @@ class MessageListViewModel(private val repo: BroadcastMessagesRepository): ViewM
     fun fetchAllMessages() {
         Log.d(this.javaClass.name, "Fetching all messages from db")
         messageList.clear()
-        val messages = repo.getAllMessages()
+        val messages = repo.getAllMessages(false)
         messageList.addAll(messages)
         updateBLEMessagesHash()
     }
@@ -29,7 +28,7 @@ class MessageListViewModel(private val repo: BroadcastMessagesRepository): ViewM
     @SuppressLint("MissingPermission")
     private fun updateBLEMessagesHash() {
         if(setCurrentHash != null) {
-            setCurrentHash?.accept(repo.calculateMessagesHash())
+            setCurrentHash?.accept(repo.getMessageHashForBLEAdvertisement())
         }
     }
 

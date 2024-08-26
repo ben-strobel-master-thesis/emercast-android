@@ -23,7 +23,6 @@ import android.os.ParcelUuid
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.RequiresPermission
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.strobel.emercast.db.EmercastDbHelper
 import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
@@ -60,7 +59,7 @@ class BLEAdvertiserService: Service() {
 
         val dbHelper = EmercastDbHelper(applicationContext)
         val repo = BroadcastMessagesRepository(dbHelper)
-        setCurrentHash(repo.calculateMessagesHash())
+        setCurrentHash(repo.getMessageHashForBLEAdvertisement())
 
         startScan()
         startAdvertising()

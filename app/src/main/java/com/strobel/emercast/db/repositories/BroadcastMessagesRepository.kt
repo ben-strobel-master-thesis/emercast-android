@@ -1,11 +1,12 @@
 package com.strobel.emercast.db.repositories
 
 import android.content.ContentValues
-import android.provider.BaseColumns
 import androidx.core.database.getLongOrNull
 import com.strobel.emercast.db.EmercastDbHelper
 import com.strobel.emercast.db.models.BroadcastMessage
 import java.security.MessageDigest
+import java.time.Instant
+import kotlin.io.encoding.Base64
 
 class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
 
@@ -48,8 +49,6 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
             put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_RECEIVED, received)
             put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_DIRECTLY_RECEIVED, directlyReceived)
             put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_SYSTEM_MESSAGE_REGARDING_AUTHORITY, systemMessageRegardingAuthority)
-
-            // put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_FORWARD_UNTIL_OVERRIDE, null)
         }
 
         return db.insert(EmercastDbHelper.Companion.BroadcastMessageEntry.TABLE_NAME, null, values)
@@ -63,16 +62,23 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
         return deletedRows > 0
     }
 
-    fun getAllMessages(): List<BroadcastMessage> {
+    fun getAllMessages(systemMessage: Boolean): List<BroadcastMessage> {
         val db = this.dbHelper.readableDatabase
 
+        val now = Instant.now().epochSecond
+
+        val selection = "${EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_FORWARD_UNTIL} > ? and " +
+                "(${EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_FORWARD_UNTIL_OVERRIDE} is null or " +
+                "${EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_FORWARD_UNTIL_OVERRIDE} > ?) and " +
+                "${EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_SYSTEM_MESSAGE} = ?"
+        val selectionArgs = arrayOf(""+now, ""+now, ""+systemMessage)
         val sortOrder = "${EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_CREATED} DESC"
 
         val cursor = db.query(
             EmercastDbHelper.Companion.BroadcastMessageEntry.TABLE_NAME,
             null,
-            null,
-            null,
+            selection,
+            selectionArgs,
             null,
             null,
             sortOrder
@@ -107,17 +113,24 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
         return messages
     }
 
-    fun calculateMessagesHash(): ByteArray {
-        val builder = StringBuilder()
-        val messages = getAllMessages()
+    fun getMessageHashForBLEAdvertisement(): ByteArray {
+        return getMessageHash(false).asList().subList(0, 16).toByteArray();
+    }
 
-        // Messages are already orderd by created timestamp (from repo)
+    private fun getMessageHash(systemMessage: Boolean): ByteArray {
+        val builder = StringBuilder()
+        val messages = getAllMessages(systemMessage)
+
+        // Messages are already ordered by created timestamp (from repo)
         messages.forEach{ m ->
             builder.append(m.issuerSignature)
         }
 
         val md = MessageDigest.getInstance("SHA-256")
-        val hash = md.digest(builder.toString().toByteArray(Charsets.UTF_8))
-        return hash.asList().subList(0, 16).toByteArray();
+        return md.digest(builder.toString().toByteArray(Charsets.UTF_8))
+    }
+
+    fun getMessageHashBase64(systemMessage: Boolean): String {
+        return java.util.Base64.getEncoder().encodeToString(getMessageHash(systemMessage))
     }
 }

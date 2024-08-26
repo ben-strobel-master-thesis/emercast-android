@@ -6,6 +6,7 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
 import com.strobel.emercast.db.EmercastDbHelper
+import com.strobel.emercast.db.repositories.AuthoritiesRepository
 
 // https://firebase.google.com/docs/cloud-messaging/android/receive
 class FCMService : FirebaseMessagingService() {
@@ -15,8 +16,9 @@ class FCMService : FirebaseMessagingService() {
 
         try {
             val dbHelper = EmercastDbHelper(baseContext)
-            val repo = BroadcastMessagesRepository(dbHelper)
-            repo.newRow(
+            val broadcastMessagesRepo = BroadcastMessagesRepository(dbHelper)
+            val authoritiesRepo = AuthoritiesRepository(dbHelper)
+            broadcastMessagesRepo.newRow(
                 message.data.getValue("id"),
                 message.data.getValue("created").toLong(),
                 message.data.getValue("systemMessage").toBoolean(),
@@ -35,6 +37,15 @@ class FCMService : FirebaseMessagingService() {
                 true,
                 message.data.getValue("systemMessageRegardingAuthority")
             )
+
+            if(message.data.getValue("systemMessage").toBoolean()) {
+                val title = message.data.getValue("title")
+                if(title == "AUTHORITY_ISSUED") {
+                    authoritiesRepo.handleNewSystemAuthorityIssuedMessage(message.data.getValue("id"))
+                } else if (title == "AUTHORITY_REVOKED") {
+                    authoritiesRepo.handleNewSystemAuthorityRevokedMessage(message.data.getValue("id"))
+                }
+            }
 
             Intent().also { intent ->
                 intent.setAction("com.strobel.emercast.NEW_BROADCAST_MESSAGE")

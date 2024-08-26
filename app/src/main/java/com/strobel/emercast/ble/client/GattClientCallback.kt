@@ -16,8 +16,6 @@ import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
 class GattClientCallback(context: Context): BluetoothGattCallback() {
     private val dbHelper = EmercastDbHelper(context)
     private val repo = BroadcastMessagesRepository(dbHelper)
-    private val gson = Gson()
-    private val messages = repo.getAllMessages()
 
     @SuppressLint("MissingPermission")
     override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
