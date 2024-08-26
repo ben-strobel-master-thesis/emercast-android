@@ -2,6 +2,7 @@ package com.strobel.emercast.db.repositories
 
 import android.content.ContentValues
 import android.provider.BaseColumns
+import androidx.core.database.getLongOrNull
 import com.strobel.emercast.db.EmercastDbHelper
 import com.strobel.emercast.db.models.BroadcastMessage
 import java.security.MessageDigest
@@ -11,9 +12,7 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
     fun newRow(
         id: String,
         created: Long,
-        modified: Long,
-        received: Long,
-        directlyReceived: Int,
+        systemMessage: Boolean,
         forwardUntil: Long,
         latitude: Float,
         longitude: Float,
@@ -21,16 +20,20 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
         category: String,
         severity: Int,
         title: String,
-        content: String
+        content: String,
+        issuedAuthorityId: String,
+        issuerSignature: String,
+
+        received: Long,
+        directlyReceived: Boolean,
+        systemMessageRegardingAuthority: String
     ): Long {
         val db = this.dbHelper.writableDatabase
 
         val values = ContentValues().apply {
             put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_ID, id)
             put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_CREATED, created)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_MODIFIED, modified)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_RECEIVED, received)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_DIRECTLY_RECEIVED, directlyReceived)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_SYSTEM_MESSAGE, systemMessage)
             put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_FORWARD_UNTIL, forwardUntil)
             put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_LATITUDE, latitude)
             put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_LONGITUDE, longitude)
@@ -39,6 +42,14 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
             put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_SEVERITY, severity)
             put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_TITLE, title)
             put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_MESSAGE, content)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_ISSUED_AUTHORITY_ID, issuedAuthorityId)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_ISSUER_SIGNATURE, issuerSignature)
+
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_RECEIVED, received)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_DIRECTLY_RECEIVED, directlyReceived)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_SYSTEM_MESSAGE_REGARDING_AUTHORITY, systemMessageRegardingAuthority)
+
+            // put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_FORWARD_UNTIL_OVERRIDE, null)
         }
 
         return db.insert(EmercastDbHelper.Companion.BroadcastMessageEntry.TABLE_NAME, null, values)
@@ -73,9 +84,7 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
             messages.add(BroadcastMessage(
                 cursor.getString(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_ID)),
                 cursor.getLong(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_CREATED)),
-                cursor.getLong(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_MODIFIED)),
-                cursor.getLong(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_RECEIVED)),
-                cursor.getInt(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_DIRECTLY_RECEIVED)),
+                cursor.getInt(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_SYSTEM_MESSAGE)) == 1,
                 cursor.getLong(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_FORWARD_UNTIL)),
                 cursor.getFloat(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_LATITUDE)),
                 cursor.getFloat(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_LONGITUDE)),
@@ -84,6 +93,14 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
                 cursor.getInt(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_SEVERITY)),
                 cursor.getString(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_TITLE)),
                 cursor.getString(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_MESSAGE)),
+                cursor.getString(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_ISSUED_AUTHORITY_ID)),
+                cursor.getString(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_ISSUER_SIGNATURE)),
+
+                cursor.getLong(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_RECEIVED)),
+                cursor.getInt(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_DIRECTLY_RECEIVED)) == 1,
+                cursor.getString(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_SYSTEM_MESSAGE_REGARDING_AUTHORITY)),
+
+                cursor.getLongOrNull(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_FORWARD_UNTIL_OVERRIDE)),
             ))
         }
         cursor.close()
@@ -96,17 +113,7 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
 
         // Messages are already orderd by created timestamp (from repo)
         messages.forEach{ m ->
-            builder.append(m.id)
-            builder.append(m.created)
-            builder.append(m.modified)
-            builder.append(m.forwardUntil)
-            builder.append(m.latitude)
-            builder.append(m.longitude)
-            builder.append(m.radius)
-            builder.append(m.category)
-            builder.append(m.severity)
-            builder.append(m.title)
-            builder.append(m.content)
+            builder.append(m.issuerSignature)
         }
 
         val md = MessageDigest.getInstance("SHA-256")

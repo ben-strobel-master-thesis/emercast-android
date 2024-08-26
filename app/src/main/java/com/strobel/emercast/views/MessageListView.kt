@@ -57,7 +57,7 @@ fun MessageListView(viewModel: MessageListViewModel) {
                         Column(modifier = Modifier
                             .width(70.dp)
                             .padding(horizontal = 20.dp)) {
-                            if(message.directlyReceived == 1)
+                            if(message.directlyReceived)
                                 Icon(painter = painterResource(R.drawable.cloud), contentDescription = "Cloud", tint = MaterialTheme.colorScheme.primary)
                             else Icon(painter = painterResource(R.drawable.bluetooth), contentDescription = "Bluetooth", tint = MaterialTheme.colorScheme.primary)
                         }

@@ -22,6 +22,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
+import com.openapi.gen.android.api.DefaultApi
 import com.strobel.emercast.ble.BLEAdvertiserService
 import com.strobel.emercast.ble.BLEAdvertiserService.Companion.hasPermissions
 import com.strobel.emercast.db.EmercastDbHelper
@@ -35,6 +36,7 @@ class MainActivity : ComponentActivity() {
     private var bleAdvertiserService: BLEAdvertiserService? = null
     private var newBroadcastMessageReceiver: BroadcastReceiver? = null
     private var viewModel: MessageListViewModel? = null
+    private val api: DefaultApi = DefaultApi(this.applicationContext, basePath = getString(R.string.api_url))
 
     @SuppressLint("MissingPermission") // Is check with hasPermissions
     override fun onStart() {

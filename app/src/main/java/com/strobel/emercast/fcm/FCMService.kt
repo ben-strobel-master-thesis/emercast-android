@@ -19,9 +19,7 @@ class FCMService : FirebaseMessagingService() {
             repo.newRow(
                 message.data.getValue("id"),
                 message.data.getValue("created").toLong(),
-                message.data.getValue("modified").toLong(),
-                System.currentTimeMillis() / 1000,
-                1,
+                message.data.getValue("systemMessage").toBoolean(),
                 message.data.getValue("forwardUntil").toLong(),
                 message.data.getValue("latitude").toFloat(),
                 message.data.getValue("longitude").toFloat(),
@@ -29,7 +27,13 @@ class FCMService : FirebaseMessagingService() {
                 message.data.getValue("category"),
                 message.data.getValue("severity").toInt(),
                 message.data.getValue("title"),
-                message.data.getValue("content")
+                message.data.getValue("content"),
+                message.data.getValue("issuedAuthorityId"),
+                message.data.getValue("issuerSignature"),
+
+                System.currentTimeMillis() / 1000,
+                true,
+                message.data.getValue("systemMessageRegardingAuthority")
             )
 
             Intent().also { intent ->

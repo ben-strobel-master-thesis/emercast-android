@@ -22,7 +22,7 @@ class GattClientWorker(private val appContext: Context, workerParams: WorkerPara
         val deviceAddress = inputData.getString("mac")
         val device = manager.adapter.getRemoteDevice(deviceAddress)
         Log.d(this.javaClass.name, "Connecting to device ${device.name} at ${device.address} of type ${device.type} with bondState ${device.bondState}")
-        gatt = device.connectGatt(appContext, false, GattClientCallback(appContext), BluetoothDevice.TRANSPORT_AUTO)
+        gatt = device.connectGatt(appContext, false, GattClientCallback(appContext))
         Log.d(this.javaClass.name, "Connect initialized")
 
         Thread.sleep(1000*15)

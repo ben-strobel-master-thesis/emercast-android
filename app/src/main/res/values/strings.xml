@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Emercast</string>
+    <string name="api_url">192.168.178.1:8080/api/v1</string>
 </resources>
