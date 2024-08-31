@@ -18,7 +18,7 @@ class FCMService : FirebaseMessagingService() {
             val dbHelper = EmercastDbHelper(baseContext)
             val broadcastMessagesRepo = BroadcastMessagesRepository(dbHelper)
             val authoritiesRepo = AuthoritiesRepository(dbHelper)
-            broadcastMessagesRepo.newRow(
+            val createdMessage = broadcastMessagesRepo.newRow(
                 message.data.getValue("id"),
                 message.data.getValue("created").toLong(),
                 message.data.getValue("systemMessage").toBoolean(),
@@ -38,12 +38,12 @@ class FCMService : FirebaseMessagingService() {
                 message.data.getValue("systemMessageRegardingAuthority")
             )
 
-            if(message.data.getValue("systemMessage").toBoolean()) {
-                val title = message.data.getValue("title")
+            if(createdMessage.systemMessage) {
+                val title = createdMessage.title
                 if(title == "AUTHORITY_ISSUED") {
-                    authoritiesRepo.handleNewSystemAuthorityIssuedMessage(message.data.getValue("id"))
+                    authoritiesRepo.handleNewSystemAuthorityIssuedMessage(createdMessage)
                 } else if (title == "AUTHORITY_REVOKED") {
-                    authoritiesRepo.handleNewSystemAuthorityRevokedMessage(message.data.getValue("id"))
+                    authoritiesRepo.handleNewSystemAuthorityRevokedMessage(createdMessage)
                 }
             }
 

@@ -1,3 +1,4 @@
+import com.google.protobuf.gradle.proto
 import org.openapitools.generator.gradle.plugin.tasks.GenerateTask
 
 plugins {
@@ -5,6 +6,7 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.android)
     id("com.google.gms.google-services")
     id("org.openapi.generator") version "6.6.0"
+    id("com.google.protobuf")
 }
 
 android {
@@ -54,6 +56,9 @@ android {
     sourceSets["main"].java {
         srcDir("$rootDir/generated/src/main/java")
     }
+    sourceSets["main"].proto {
+        srcDir("$rootDir/api-specs")
+    }
     tasks.preBuild {
         dependsOn(tasks.withType<GenerateTask>())
     }
@@ -74,6 +79,20 @@ openApiGenerate {
     ))
 }
 
+protobuf {
+    protoc { artifact = "com.google.protobuf:protoc:3.25.4" }
+    generateProtoTasks {
+        all().forEach { task ->
+            task.builtins {
+               create("java") {
+                   option("lite")
+               }
+            }
+        }
+    }
+    // files("$rootDir/api specs")
+}
+
 dependencies {
 
     implementation(libs.androidx.core.ktx)
@@ -90,6 +109,7 @@ dependencies {
     implementation(libs.volley)
     implementation(libs.gson)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.protobuf)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
