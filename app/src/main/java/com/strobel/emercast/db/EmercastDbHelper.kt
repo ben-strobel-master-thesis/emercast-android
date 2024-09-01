@@ -26,7 +26,7 @@ class EmercastDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
     }
     companion object {
         // If you change the database schema, you must increment the database version.
-        const val DATABASE_VERSION = 2
+        const val DATABASE_VERSION = 3
         const val DATABASE_NAME = "Emercast.db"
 
         object AuthorityEntry: BaseColumns {
@@ -121,7 +121,7 @@ class EmercastDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
 
                     "${BroadcastMessageEntry.COLUMN_NAME_RECEIVED} INTEGER not null," +
                     "${BroadcastMessageEntry.COLUMN_NAME_DIRECTLY_RECEIVED} INTEGER not null," +
-                    "${BroadcastMessageEntry.COLUMN_NAME_SYSTEM_MESSAGE_REGARDING_AUTHORITY} TEXT not null," +
+                    "${BroadcastMessageEntry.COLUMN_NAME_SYSTEM_MESSAGE_REGARDING_AUTHORITY} TEXT," +
 
                     "${BroadcastMessageEntry.COLUMN_NAME_FORWARD_UNTIL_OVERRIDE} INTEGER)"
 

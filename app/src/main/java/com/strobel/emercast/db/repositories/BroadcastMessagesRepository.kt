@@ -13,50 +13,30 @@ import kotlin.io.encoding.Base64
 // TODO Split into repo & service
 class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
 
-    fun newRow(
-        id: String,
-        created: Long,
-        systemMessage: Boolean,
-        forwardUntil: Long,
-        latitude: Float,
-        longitude: Float,
-        radius: Int,
-        category: String,
-        severity: Int,
-        title: String,
-        content: String,
-        issuedAuthorityId: String,
-        issuerSignature: String,
-
-        received: Long,
-        directlyReceived: Boolean,
-        systemMessageRegardingAuthority: String
-    ): BroadcastMessage {
+    fun newRow(broadcastMessage: BroadcastMessage) {
         val db = this.dbHelper.writableDatabase
 
         val values = ContentValues().apply {
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_ID, id)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_CREATED, created)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_SYSTEM_MESSAGE, systemMessage)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_FORWARD_UNTIL, forwardUntil)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_LATITUDE, latitude)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_LONGITUDE, longitude)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_RADIUS, radius)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_CATEGORY, category)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_SEVERITY, severity)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_TITLE, title)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_MESSAGE, content)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_ISSUED_AUTHORITY_ID, issuedAuthorityId)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_ISSUER_SIGNATURE, issuerSignature)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_ID, broadcastMessage.id)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_CREATED, broadcastMessage.created)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_SYSTEM_MESSAGE, broadcastMessage.systemMessage)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_FORWARD_UNTIL, broadcastMessage.forwardUntil)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_LATITUDE, broadcastMessage.latitude)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_LONGITUDE, broadcastMessage.longitude)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_RADIUS, broadcastMessage.radius)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_CATEGORY, broadcastMessage.category)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_SEVERITY, broadcastMessage.severity)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_TITLE, broadcastMessage.title)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_MESSAGE, broadcastMessage.content)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_ISSUED_AUTHORITY_ID, broadcastMessage.issuedAuthorityId)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_ISSUER_SIGNATURE, broadcastMessage.issuerSignature)
 
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_RECEIVED, received)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_DIRECTLY_RECEIVED, directlyReceived)
-            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_SYSTEM_MESSAGE_REGARDING_AUTHORITY, systemMessageRegardingAuthority)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_RECEIVED, broadcastMessage.received)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_DIRECTLY_RECEIVED, broadcastMessage.directlyReceived)
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_SYSTEM_MESSAGE_REGARDING_AUTHORITY, broadcastMessage.systemMessageRegardingAuthority)
         }
 
         db.insert(EmercastDbHelper.Companion.BroadcastMessageEntry.TABLE_NAME, null, values)
-
-        return getById(db, id)!!
     }
 
     fun deleteMessage(message: BroadcastMessage): Boolean {
@@ -98,7 +78,9 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
         return messages
     }
 
-    private fun getById(db: SQLiteDatabase, id: String): BroadcastMessage? {
+    fun findById(id: String): BroadcastMessage? {
+        val db = this.dbHelper.readableDatabase
+
         val cursor = db.query(
             EmercastDbHelper.Companion.BroadcastMessageEntry.TABLE_NAME,
             null,
@@ -111,6 +93,21 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
         val result = getFromCursor(cursor)
         cursor.close()
         return result
+    }
+
+    fun updateForwardUntilOverride(broadcastMessageId: String, forwardUntilOverride: Long?) {
+        val db = this.dbHelper.writableDatabase
+
+        val values = ContentValues().apply {
+            put(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_FORWARD_UNTIL_OVERRIDE, forwardUntilOverride)
+        }
+
+        db.update(
+            EmercastDbHelper.Companion.BroadcastMessageEntry.TABLE_NAME,
+            values,
+            "${EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_ID} = ?",
+            arrayOf(broadcastMessageId)
+        )
     }
 
     private fun getFromCursor(cursor: Cursor): BroadcastMessage? {
@@ -157,5 +154,23 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
 
     fun getMessageHashBase64(systemMessage: Boolean): String {
         return java.util.Base64.getEncoder().encodeToString(getMessageHash(systemMessage))
+    }
+
+    companion object {
+        fun getMessageBytesForDigest(broadcastMessage: BroadcastMessage): ByteArray {
+            val builder = StringBuilder()
+            builder.append(broadcastMessage.created)
+            builder.append(broadcastMessage.issuedAuthorityId)
+            builder.append(broadcastMessage.systemMessage)
+            builder.append(broadcastMessage.forwardUntil)
+            builder.append(broadcastMessage.latitude)
+            builder.append(broadcastMessage.longitude)
+            builder.append(broadcastMessage.radius)
+            builder.append(broadcastMessage.category)
+            builder.append(broadcastMessage.severity)
+            builder.append(broadcastMessage.title)
+            builder.append(broadcastMessage.content)
+            return builder.toString().toByteArray(Charsets.UTF_8)
+        }
     }
 }

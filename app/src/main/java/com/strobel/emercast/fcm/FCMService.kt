@@ -6,7 +6,9 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
 import com.strobel.emercast.db.EmercastDbHelper
+import com.strobel.emercast.db.models.BroadcastMessage
 import com.strobel.emercast.db.repositories.AuthoritiesRepository
+import com.strobel.emercast.services.BroadcastMessageService
 
 // https://firebase.google.com/docs/cloud-messaging/android/receive
 class FCMService : FirebaseMessagingService() {
@@ -15,10 +17,7 @@ class FCMService : FirebaseMessagingService() {
         Log.d(this.javaClass.name, "Message Received: " + message.messageId + " " + message.data)
 
         try {
-            val dbHelper = EmercastDbHelper(baseContext)
-            val broadcastMessagesRepo = BroadcastMessagesRepository(dbHelper)
-            val authoritiesRepo = AuthoritiesRepository(dbHelper)
-            val createdMessage = broadcastMessagesRepo.newRow(
+            val broadcastMessage = BroadcastMessage(
                 message.data.getValue("id"),
                 message.data.getValue("created").toLong(),
                 message.data.getValue("systemMessage").toBoolean(),
@@ -35,17 +34,12 @@ class FCMService : FirebaseMessagingService() {
 
                 System.currentTimeMillis() / 1000,
                 true,
-                message.data.getValue("systemMessageRegardingAuthority")
+                message.data.getValue("systemMessageRegardingAuthority"),
+                null
             )
 
-            if(createdMessage.systemMessage) {
-                val title = createdMessage.title
-                if(title == "AUTHORITY_ISSUED") {
-                    authoritiesRepo.handleNewSystemAuthorityIssuedMessage(createdMessage)
-                } else if (title == "AUTHORITY_REVOKED") {
-                    authoritiesRepo.handleNewSystemAuthorityRevokedMessage(createdMessage)
-                }
-            }
+            val broadcastMessageService = BroadcastMessageService(EmercastDbHelper(baseContext))
+            broadcastMessageService.handleBroadcastMessageReceived(broadcastMessage)
 
             Intent().also { intent ->
                 intent.setAction("com.strobel.emercast.NEW_BROADCAST_MESSAGE")
