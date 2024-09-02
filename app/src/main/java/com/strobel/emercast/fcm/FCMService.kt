@@ -39,7 +39,7 @@ class FCMService : FirebaseMessagingService() {
             )
 
             val broadcastMessageService = BroadcastMessageService(EmercastDbHelper(baseContext))
-            broadcastMessageService.handleBroadcastMessageReceived(broadcastMessage)
+            broadcastMessageService.handleBroadcastMessageReceived(broadcastMessage, baseContext)
 
             Intent().also { intent ->
                 intent.setAction("com.strobel.emercast.NEW_BROADCAST_MESSAGE")

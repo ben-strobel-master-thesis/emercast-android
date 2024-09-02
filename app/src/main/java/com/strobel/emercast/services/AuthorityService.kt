@@ -19,7 +19,7 @@ class AuthorityService(dbHelper: EmercastDbHelper) {
 
     private val authoritiesRepository = AuthoritiesRepository(dbHelper)
 
-    fun handleNewSystemAuthorityIssuedMessage(broadcastMessage: BroadcastMessage): Boolean {
+    fun handleNewSystemAuthorityIssuedMessage(broadcastMessage: BroadcastMessage, pinnedRootAuthorityPublicKey: String): Boolean {
         val payload = SystemBroadcastMessageAuthorityIssuedPayloadPBO.parseFrom(Base64.getDecoder().decode(broadcastMessage.content))
         broadcastMessage.systemMessageRegardingAuthority = payload.authority.id
 
@@ -32,6 +32,8 @@ class AuthorityService(dbHelper: EmercastDbHelper) {
             payload.authority.publicKeyBase64,
             null
         )
+
+        if(authority.id == ROOT_AUTHORITY_UUID && authority.publicKeyBase64 != pinnedRootAuthorityPublicKey) return false
 
         if(broadcastMessage.issuedAuthorityId != authority.createdBy) return false
         authoritiesRepository.newRow(authority)
@@ -59,6 +61,10 @@ class AuthorityService(dbHelper: EmercastDbHelper) {
         )
     }
 
+    fun doesAuthorityExist(authorityId: String, validAt: Long): Boolean {
+        return authoritiesRepository.getAuthority(authorityId, validAt) != null
+    }
+
     // The signed content must be provided within the message that is to be verified
     // The plain content must be calculated using the data in the message that is to be verified
     private fun verifyContentWasSignedByAuthority(signerAuthority: Authority, signedContent: String, plainContent: ByteArray): Boolean {
@@ -80,5 +86,9 @@ class AuthorityService(dbHelper: EmercastDbHelper) {
         } catch (e: InvalidKeySpecException) {
             throw RuntimeException(e)
         }
+    }
+
+    companion object {
+        const val ROOT_AUTHORITY_UUID = "00000000-0000-0000-0000-000000000000"
     }
 }

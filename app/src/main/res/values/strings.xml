@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">Emercast</string>
     <string name="api_url">http://192.168.178.81:8080/api/v1</string>
+    <string name="pinned_root_authority_public_key">MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsDXZSPV1iJ28yzaLCN4I5ShyGgaItNUC9N5p2n8RDc8Gfu92XocN5a2AB5G7vE0u/OCTNqZ/pin47oXBIvY3rLJUoQd3AD6DqT8qQ/Dped0D/o/5lMArHSq0fMzSMtl5rOTWTiJ+zmqI8Vcsou1VIcv/t8ATWYxGWDhzJ1l/UIlVV8kCg+XZvKkrk9X1iBFu89Z1kzh5QU3MX+UCjrkDDxjZWpMl/AAcouVDXkM+4mKLjv08q8Uxi74KqxFjCZC60N07c3wYsAePLW8kiWraZWCBl/TA79EjQKxoqY3lpc5DGShuC/9mdLFKRYXfkJHAjS6XbRQDFs1pkPMWYm/iIQIDAQAB</string>
 </resources>

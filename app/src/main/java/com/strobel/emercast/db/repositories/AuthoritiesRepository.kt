@@ -33,10 +33,10 @@ class AuthoritiesRepository(private val dbHelper: EmercastDbHelper) {
         val db = this.dbHelper.readableDatabase
 
         val selection = "${EmercastDbHelper.Companion.AuthorityEntry.COLUMN_NAME_ID} = ? and " +
-            "(${EmercastDbHelper.Companion.AuthorityEntry.COLUMN_NAME_REVOKED_AFTER} is null or" +
-            "${EmercastDbHelper.Companion.AuthorityEntry.COLUMN_NAME_REVOKED_AFTER} > ?) and" +
-            "${EmercastDbHelper.Companion.AuthorityEntry.COLUMN_NAME_VALID_UNTIL} > ? and" +
-            "${EmercastDbHelper.Companion.AuthorityEntry.COLUMN_NAME_CREATED} < ? and"
+            "(${EmercastDbHelper.Companion.AuthorityEntry.COLUMN_NAME_REVOKED_AFTER} is null or " +
+            "${EmercastDbHelper.Companion.AuthorityEntry.COLUMN_NAME_REVOKED_AFTER} > ?) and " +
+            "${EmercastDbHelper.Companion.AuthorityEntry.COLUMN_NAME_VALID_UNTIL} > ? and " +
+            "${EmercastDbHelper.Companion.AuthorityEntry.COLUMN_NAME_CREATED} < ?"
 
         val selectionArgs = arrayOf(authorityId, ""+authorityValidAt, ""+authorityValidAt, ""+authorityValidAt)
         val sortOrder = "${EmercastDbHelper.Companion.AuthorityEntry.COLUMN_NAME_CREATED} DESC"

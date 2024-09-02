@@ -12,7 +12,6 @@ import java.time.Instant
 
 class BroadcastMessageService(private val dbHelper: EmercastDbHelper) {
 
-    private val rootAuthorityUuid = "00000000-0000-0000-0000-000000000000"
     private val authorityService = AuthorityService(dbHelper)
     private val broadcastMessagesRepository = BroadcastMessagesRepository(dbHelper)
 
@@ -25,19 +24,19 @@ class BroadcastMessageService(private val dbHelper: EmercastDbHelper) {
 
             var response = api.getBroadcastMessageChainHash(true)
             if(response?.hash != broadcastMessageHashSystem) {
-                pullPaginatedBroadcastMessagesFromServer(true, api)
+                pullPaginatedBroadcastMessagesFromServer(true, api, context)
             }
 
             response = api.getBroadcastMessageChainHash(false)
             if(response?.hash != broadcastMessageHashNonSystem) {
-                pullPaginatedBroadcastMessagesFromServer(false, api)
+                pullPaginatedBroadcastMessagesFromServer(false, api, context)
             }
         } catch (ex: Exception) {
             ex.printStackTrace()
         }
     }
 
-    private suspend fun pullPaginatedBroadcastMessagesFromServer(systemMessage: Boolean, api: DefaultApi) {
+    private suspend fun pullPaginatedBroadcastMessagesFromServer(systemMessage: Boolean, api: DefaultApi, context: Context) {
         // TODO Optimize:
         //  Non System Messages: (sync order newest -> oldest) Abort once hash is equal
         //  System Messages: (sync order oldest -> newest) Start at newest authority
@@ -50,7 +49,7 @@ class BroadcastMessageService(private val dbHelper: EmercastDbHelper) {
             val items = api.getBroadcastMessagesPage(pageable.page, pageable.pageSize, systemMessage).orEmpty()
 
             for (msg in items) {
-                handleBroadcastMessageReceived(msg.toDBO(Instant.now().epochSecond, true))
+                handleBroadcastMessageReceived(msg.toDBO(Instant.now().epochSecond, true), context)
             }
 
             lastPageItemCount = items.size
@@ -59,13 +58,19 @@ class BroadcastMessageService(private val dbHelper: EmercastDbHelper) {
         }
     }
 
-    fun handleBroadcastMessageReceived(broadcastMessage: BroadcastMessage) {
-        if(broadcastMessage.issuedAuthorityId == rootAuthorityUuid || !authorityService.verifyBroadcastMessage(broadcastMessage)) return
+    fun handleBroadcastMessageReceived(broadcastMessage: BroadcastMessage, context: Context) {
+        if(broadcastMessage.issuedAuthorityId == AuthorityService.ROOT_AUTHORITY_UUID) {
+            if(authorityService.doesAuthorityExist(AuthorityService.ROOT_AUTHORITY_UUID, broadcastMessage.created)) {
+                if(!authorityService.verifyBroadcastMessage(broadcastMessage)) return
+            }
+        } else {
+            if(!authorityService.verifyBroadcastMessage(broadcastMessage)) return
+        }
 
         if(broadcastMessage.systemMessage) {
             val title = broadcastMessage.title
             if(title == "AUTHORITY_ISSUED") {
-                if(!authorityService.handleNewSystemAuthorityIssuedMessage(broadcastMessage)) return
+                if(!authorityService.handleNewSystemAuthorityIssuedMessage(broadcastMessage, context.resources.getString(R.string.pinned_root_authority_public_key))) return
             } else if (title == "AUTHORITY_REVOKED") {
                 if(!authorityService.handleNewSystemAuthorityRevokedMessage(broadcastMessage, this)) return
             }

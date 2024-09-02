@@ -18,12 +18,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
-import com.openapi.gen.android.api.DefaultApi
 import com.strobel.emercast.ble.BLEAdvertiserService
 import com.strobel.emercast.ble.BLEAdvertiserService.Companion.hasPermissions
 import com.strobel.emercast.db.EmercastDbHelper
@@ -33,7 +31,6 @@ import com.strobel.emercast.ui.theme.EmercastTheme
 import com.strobel.emercast.views.MessageListView
 import com.strobel.emercast.views.MessageListViewModel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity() {
     private val manager: BluetoothManager? get() = applicationContext.getSystemService()!!
