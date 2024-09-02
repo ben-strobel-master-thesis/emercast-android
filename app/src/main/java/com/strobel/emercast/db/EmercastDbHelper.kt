@@ -12,12 +12,21 @@ class EmercastDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
         db.execSQL(SQL_CREATE_BROADCAST_MESSAGES)
         db.execSQL(SQL_CREATE_JURISDICTION_MARKERS)
         db.execSQL(SQL_CREATE_AUTHORITIES)
+
+        db.execSQL(SQL_CREATE_AUTHORITIES_INDEX)
+        db.execSQL(SQL_CREATE_JURISDICTION_MARKERS_INDEX)
     }
+
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         db.execSQL(SQL_DELETE_BROADCAST_MESSAGES_TABLE)
         db.execSQL(SQL_DELETE_AUTHORITIES_TABLE)
-        db.execSQL(SQL_CREATE_AUTHORITIES_INDEX)
         db.execSQL(SQL_DELETE_JURISDICTION_MARKERS_TABLE)
+
+        db.execSQL(SQL_CREATE_BROADCAST_MESSAGES)
+        db.execSQL(SQL_CREATE_JURISDICTION_MARKERS)
+        db.execSQL(SQL_CREATE_AUTHORITIES)
+
+        db.execSQL(SQL_CREATE_AUTHORITIES_INDEX)
         db.execSQL(SQL_CREATE_JURISDICTION_MARKERS_INDEX)
         onCreate(db)
     }
@@ -51,6 +60,7 @@ class EmercastDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
                     "${AuthorityEntry.COLUMN_NAME_PUBLIC_KEY_BASE64} TEXT not null," +
                     "${AuthorityEntry.COLUMN_NAME_REVOKED_AFTER} INTEGER," +
                     "PRIMARY KEY (${AuthorityEntry.COLUMN_NAME_ID}, ${AuthorityEntry.COLUMN_NAME_CREATED}))"
+
         private const val SQL_CREATE_AUTHORITIES_INDEX =
             "CREATE INDEX authorities_id_idx ON ${AuthorityEntry.TABLE_NAME} (${AuthorityEntry.COLUMN_NAME_ID})";
 
@@ -75,7 +85,7 @@ class EmercastDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
                     "${JurisdictionMarkerEntry.COLUMN_NAME_RADIUS_METERS} INTEGER not null)"
 
         private const val SQL_CREATE_JURISDICTION_MARKERS_INDEX =
-            "CREATE INDEX authorities_id_idx ON ${JurisdictionMarkerEntry.TABLE_NAME} (${JurisdictionMarkerEntry.COLUMN_NAME_AUTHORITY_ID}, ${JurisdictionMarkerEntry.COLUMN_NAME_AUTHORITY_CREATED})";
+            "CREATE INDEX jurisdiction_marker_id_idx ON ${JurisdictionMarkerEntry.TABLE_NAME} (${JurisdictionMarkerEntry.COLUMN_NAME_AUTHORITY_ID}, ${JurisdictionMarkerEntry.COLUMN_NAME_AUTHORITY_CREATED})";
 
         object BroadcastMessageEntry : BaseColumns {
             const val TABLE_NAME = "BroadcastMessages"

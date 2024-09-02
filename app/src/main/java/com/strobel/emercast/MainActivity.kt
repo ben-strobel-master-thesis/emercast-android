@@ -20,6 +20,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
+import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
 import com.openapi.gen.android.api.DefaultApi
@@ -27,16 +28,18 @@ import com.strobel.emercast.ble.BLEAdvertiserService
 import com.strobel.emercast.ble.BLEAdvertiserService.Companion.hasPermissions
 import com.strobel.emercast.db.EmercastDbHelper
 import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
+import com.strobel.emercast.services.BroadcastMessageService
 import com.strobel.emercast.ui.theme.EmercastTheme
 import com.strobel.emercast.views.MessageListView
 import com.strobel.emercast.views.MessageListViewModel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity() {
     private val manager: BluetoothManager? get() = applicationContext.getSystemService()!!
     private var bleAdvertiserService: BLEAdvertiserService? = null
     private var newBroadcastMessageReceiver: BroadcastReceiver? = null
     private var viewModel: MessageListViewModel? = null
-    private val api: DefaultApi = DefaultApi(this.applicationContext, basePath = getString(R.string.api_url))
 
     @SuppressLint("MissingPermission") // Is check with hasPermissions
     override fun onStart() {
@@ -111,7 +114,11 @@ class MainActivity : ComponentActivity() {
             }
         }
         applicationContext.registerReceiver(newBroadcastMessageReceiver, IntentFilter("com.strobel.emercast.NEW_BROADCAST_MESSAGE"), RECEIVER_EXPORTED)
-        viewModel?.fetchAllMessages()
+        val broadcastMessageService = BroadcastMessageService(EmercastDbHelper(applicationContext))
+        lifecycleScope.launch {
+            broadcastMessageService.pullBroadcastMessagesFromServer(applicationContext)
+            viewModel?.fetchAllMessages()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

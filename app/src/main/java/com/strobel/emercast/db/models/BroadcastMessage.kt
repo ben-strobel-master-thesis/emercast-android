@@ -18,7 +18,7 @@ data class BroadcastMessage (
 
     val received: Long,
     val directlyReceived: Boolean,
-    val systemMessageRegardingAuthority: String,
+    var systemMessageRegardingAuthority: String?,
 
     var forwardUntilOverride: Long?
 )

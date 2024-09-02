@@ -21,6 +21,8 @@ class AuthorityService(dbHelper: EmercastDbHelper) {
 
     fun handleNewSystemAuthorityIssuedMessage(broadcastMessage: BroadcastMessage): Boolean {
         val payload = SystemBroadcastMessageAuthorityIssuedPayloadPBO.parseFrom(Base64.getDecoder().decode(broadcastMessage.content))
+        broadcastMessage.systemMessageRegardingAuthority = payload.authority.id
+
         val authority = Authority(
             payload.authority.id,
             payload.authority.created,
@@ -38,6 +40,7 @@ class AuthorityService(dbHelper: EmercastDbHelper) {
 
     fun handleNewSystemAuthorityRevokedMessage(broadcastMessage: BroadcastMessage, broadcastMessageService: BroadcastMessageService): Boolean {
         val payload = SystemBroadcastMessageAuthorityRevokedPayloadPBO.parseFrom(Base64.getDecoder().decode(broadcastMessage.content))
+        broadcastMessage.systemMessageRegardingAuthority = payload.authorityId
 
         val authority = authoritiesRepository.getAuthority(payload.authorityId, payload.revokedDate)?: return false
         broadcastMessageService.overrideForwardUntil(authority.id, payload.canBeDeletedAt)

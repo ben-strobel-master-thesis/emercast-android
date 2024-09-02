@@ -1,16 +1,66 @@
 package com.strobel.emercast.services
 
+import android.content.Context
+import com.openapi.gen.android.api.DefaultApi
+import com.openapi.gen.android.dto.BroadcastMessageDTO
+import com.strobel.emercast.R
 import com.strobel.emercast.db.EmercastDbHelper
 import com.strobel.emercast.db.models.BroadcastMessage
 import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
+import com.strobel.emercast.lib.Pageable
+import java.time.Instant
 
 class BroadcastMessageService(private val dbHelper: EmercastDbHelper) {
 
+    private val rootAuthorityUuid = "00000000-0000-0000-0000-000000000000"
     private val authorityService = AuthorityService(dbHelper)
     private val broadcastMessagesRepository = BroadcastMessagesRepository(dbHelper)
 
+    suspend fun pullBroadcastMessagesFromServer(context: Context) {
+        try {
+            val api = DefaultApi(context, basePath = context.resources.getString(R.string.api_url))
+
+            val broadcastMessageHashSystem = broadcastMessagesRepository.getMessageHashBase64(true)
+            val broadcastMessageHashNonSystem = broadcastMessagesRepository.getMessageHashBase64(false)
+
+            var response = api.getBroadcastMessageChainHash(true)
+            if(response?.hash != broadcastMessageHashSystem) {
+                pullPaginatedBroadcastMessagesFromServer(true, api)
+            }
+
+            response = api.getBroadcastMessageChainHash(false)
+            if(response?.hash != broadcastMessageHashNonSystem) {
+                pullPaginatedBroadcastMessagesFromServer(false, api)
+            }
+        } catch (ex: Exception) {
+            ex.printStackTrace()
+        }
+    }
+
+    private suspend fun pullPaginatedBroadcastMessagesFromServer(systemMessage: Boolean, api: DefaultApi) {
+        // TODO Optimize:
+        //  Non System Messages: (sync order newest -> oldest) Abort once hash is equal
+        //  System Messages: (sync order oldest -> newest) Start at newest authority
+
+        var lastPageItemCount = 0
+        var first = true
+        var pageable = Pageable(0, 20)
+
+        while (lastPageItemCount >= pageable.pageSize || first) {
+            val items = api.getBroadcastMessagesPage(pageable.page, pageable.pageSize, systemMessage).orEmpty()
+
+            for (msg in items) {
+                handleBroadcastMessageReceived(msg.toDBO(Instant.now().epochSecond, true))
+            }
+
+            lastPageItemCount = items.size
+            pageable = Pageable(pageable.page+1, pageable.pageSize)
+            first = false
+        }
+    }
+
     fun handleBroadcastMessageReceived(broadcastMessage: BroadcastMessage) {
-        if(!authorityService.verifyBroadcastMessage(broadcastMessage)) return
+        if(broadcastMessage.issuedAuthorityId == rootAuthorityUuid || !authorityService.verifyBroadcastMessage(broadcastMessage)) return
 
         if(broadcastMessage.systemMessage) {
             val title = broadcastMessage.title
@@ -31,5 +81,30 @@ class BroadcastMessageService(private val dbHelper: EmercastDbHelper) {
         broadcastMessagesRepository.updateForwardUntilOverride(broadcastMessage.id, newOverrideForwardUntil)
 
         return true
+    }
+
+    fun BroadcastMessageDTO.toDBO(received: Long, directlyReceived: Boolean): BroadcastMessage {
+        return BroadcastMessage(
+            this.id.toString(),
+            this.created,
+            this.systemMessage,
+            this.forwardUntil,
+            this.latitude,
+            this.longitude,
+            this.radius,
+            this.category,
+            this.severity,
+            this.title,
+            this.message,
+
+            this.issuedAuthority.toString(),
+            this.issuerSignature,
+
+            received,
+            directlyReceived,
+            null,
+
+            null
+        )
     }
 }
