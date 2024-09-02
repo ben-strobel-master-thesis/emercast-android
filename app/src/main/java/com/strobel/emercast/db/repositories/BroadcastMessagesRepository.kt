@@ -2,13 +2,11 @@ package com.strobel.emercast.db.repositories
 
 import android.content.ContentValues
 import android.database.Cursor
-import android.database.sqlite.SQLiteDatabase
 import androidx.core.database.getLongOrNull
 import com.strobel.emercast.db.EmercastDbHelper
 import com.strobel.emercast.db.models.BroadcastMessage
 import java.security.MessageDigest
 import java.time.Instant
-import kotlin.io.encoding.Base64
 
 // TODO Split into repo & service
 class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
@@ -136,11 +134,11 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
         )
     }
 
-    fun getMessageHashForBLEAdvertisement(): ByteArray {
-        return getMessageHash(false).asList().subList(0, 16).toByteArray();
+    fun getMessageChainHashForBLEAdvertisement(): ByteArray {
+        return getMessageChainHash(false).asList().subList(0, 16).toByteArray();
     }
 
-    private fun getMessageHash(systemMessage: Boolean): ByteArray {
+    private fun getMessageChainHash(systemMessage: Boolean): ByteArray {
         val builder = StringBuilder()
         val messages = getAllMessages(systemMessage)
 
@@ -153,8 +151,8 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
         return md.digest(builder.toString().toByteArray(Charsets.UTF_8))
     }
 
-    fun getMessageHashBase64(systemMessage: Boolean): String {
-        return java.util.Base64.getEncoder().encodeToString(getMessageHash(systemMessage))
+    fun getMessageChainHashBase64(systemMessage: Boolean): String {
+        return java.util.Base64.getEncoder().encodeToString(getMessageChainHash(systemMessage))
     }
 
     companion object {

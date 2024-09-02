@@ -59,7 +59,7 @@ class BLEAdvertiserService: Service() {
 
         val dbHelper = EmercastDbHelper(applicationContext)
         val repo = BroadcastMessagesRepository(dbHelper)
-        setCurrentHash(repo.getMessageHashForBLEAdvertisement())
+        setCurrentHash(repo.getMessageChainHashForBLEAdvertisement())
 
         startScan()
         startAdvertising()

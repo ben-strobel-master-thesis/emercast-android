@@ -9,9 +9,11 @@ import com.strobel.emercast.db.EmercastDbHelper
 import com.strobel.emercast.db.models.BroadcastMessage
 import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
 import com.strobel.emercast.lib.Pageable
+import com.strobel.emercast.protobuf.BroadcastMessageInfoPBO
+import com.strobel.emercast.protobuf.BroadcastMessagePBO
 import java.time.Instant
 
-class BroadcastMessageService(private val dbHelper: EmercastDbHelper) {
+class BroadcastMessageService(dbHelper: EmercastDbHelper) {
 
     private val authorityService = AuthorityService(dbHelper)
     private val broadcastMessagesRepository = BroadcastMessagesRepository(dbHelper)
@@ -20,8 +22,8 @@ class BroadcastMessageService(private val dbHelper: EmercastDbHelper) {
         try {
             val api = DefaultApi(context, basePath = context.resources.getString(R.string.api_url))
 
-            val broadcastMessageHashSystem = broadcastMessagesRepository.getMessageHashBase64(true)
-            val broadcastMessageHashNonSystem = broadcastMessagesRepository.getMessageHashBase64(false)
+            val broadcastMessageHashSystem = broadcastMessagesRepository.getMessageChainHashBase64(true)
+            val broadcastMessageHashNonSystem = broadcastMessagesRepository.getMessageChainHashBase64(false)
 
             var response = api.getBroadcastMessageChainHash(true)
             if(response?.hash != broadcastMessageHashSystem) {
@@ -92,28 +94,93 @@ class BroadcastMessageService(private val dbHelper: EmercastDbHelper) {
         return true
     }
 
-    fun BroadcastMessageDTO.toDBO(received: Long, directlyReceived: Boolean): BroadcastMessage {
-        return BroadcastMessage(
-            this.id.toString(),
-            this.created,
-            this.systemMessage,
-            this.forwardUntil,
-            this.latitude,
-            this.longitude,
-            this.radius,
-            this.category,
-            this.severity,
-            this.title,
-            this.message,
+    fun findMessageById(id: String): BroadcastMessage? {
+        return broadcastMessagesRepository.findById(id)
+    }
 
-            this.issuedAuthority.toString(),
-            this.issuerSignature,
+    fun getAllMessages(systemMessage: Boolean): List<BroadcastMessage> {
+        return broadcastMessagesRepository.getAllMessages(systemMessage)
+    }
 
-            received,
-            directlyReceived,
-            null,
+    fun getMessageChainHash(systemMessage: Boolean): String {
+        return broadcastMessagesRepository.getMessageChainHashBase64(systemMessage)
+    }
 
-            null
-        )
+    companion object {
+        fun BroadcastMessageDTO.toDBO(received: Long, directlyReceived: Boolean): BroadcastMessage {
+            return BroadcastMessage(
+                this.id.toString(),
+                this.created,
+                this.systemMessage,
+                this.forwardUntil,
+                this.latitude,
+                this.longitude,
+                this.radius,
+                this.category,
+                this.severity,
+                this.title,
+                this.message,
+
+                this.issuedAuthority.toString(),
+                this.issuerSignature,
+
+                received,
+                directlyReceived,
+                null,
+
+                null
+            )
+        }
+
+        fun BroadcastMessagePBO.toDBO(): BroadcastMessage {
+            return BroadcastMessage(
+                this.id,
+                this.created,
+                this.systemMessage,
+                this.forwardUntil,
+                this.latitude,
+                this.longitude,
+                this.radius,
+                this.category,
+                this.severity,
+                this.title,
+                this.message,
+                this.issuedAuthority,
+                this.issuerSignature,
+
+                Instant.now().epochSecond,
+                false,
+                null,
+
+                null
+            )
+        }
+
+        fun BroadcastMessage.toPBO(): BroadcastMessagePBO {
+            return BroadcastMessagePBO
+                .newBuilder()
+                .setId(this.id)
+                .setCreated(this.created)
+                .setSystemMessage(this.systemMessage)
+                .setForwardUntil(this.forwardUntil)
+                .setLatitude(this.latitude)
+                .setLongitude(this.longitude)
+                .setRadius(this.radius)
+                .setCategory(this.category)
+                .setSeverity(this.severity)
+                .setTitle(this.title)
+                .setMessage(this.content)
+                .setIssuedAuthority(this.issuedAuthorityId)
+                .setIssuerSignature(this.issuerSignature)
+                .build()
+        }
+
+        fun BroadcastMessage.toInfoPBO(): BroadcastMessageInfoPBO {
+            return BroadcastMessageInfoPBO
+                .newBuilder()
+                .setId(this.id)
+                .setCreated(this.created)
+                .build()
+        }
     }
 }

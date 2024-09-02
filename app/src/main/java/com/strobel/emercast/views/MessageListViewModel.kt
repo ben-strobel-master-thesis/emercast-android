@@ -28,7 +28,7 @@ class MessageListViewModel(private val repo: BroadcastMessagesRepository): ViewM
     @SuppressLint("MissingPermission")
     private fun updateBLEMessagesHash() {
         if(setCurrentHash != null) {
-            setCurrentHash?.accept(repo.getMessageHashForBLEAdvertisement())
+            setCurrentHash?.accept(repo.getMessageChainHashForBLEAdvertisement())
         }
     }
 
