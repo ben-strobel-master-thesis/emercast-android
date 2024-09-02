@@ -6,15 +6,15 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattServerCallback
 import android.content.Context
 import android.util.Log
+import com.strobel.emercast.ble.protocol.ServerProtocolLogic
 import com.strobel.emercast.db.EmercastDbHelper
 import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
+import com.strobel.emercast.protobuf.BroadcastMessagePBO
 
-class GattServerCallback(private val context: Context, private val sendResponse: (BluetoothDevice, Int, Int, Int, ByteArray) -> Boolean): BluetoothGattServerCallback() {
-    private val dbHelper = EmercastDbHelper(context)
-    private val repo = BroadcastMessagesRepository(dbHelper)
-    // private val gson = Gson()
-    // private val messages = repo.getAllMessages()
-
+class GattServerCallback(
+    private val sendResponse: (BluetoothDevice, Int, Int, Int, ByteArray) -> Boolean,
+    private val serverProtocolLogic: ServerProtocolLogic
+): BluetoothGattServerCallback() {
     override fun onConnectionStateChange(
         device: BluetoothDevice,
         status: Int,
@@ -24,6 +24,7 @@ class GattServerCallback(private val context: Context, private val sendResponse:
         Log.d(this.javaClass.name, "onConnectionStateChange: $status $newState")
     }
 
+    // TODO Be able to handle partial reads (when value didn't fit into mtu)
     override fun onCharacteristicWriteRequest(
         device: BluetoothDevice,
         requestId: Int,
@@ -35,6 +36,15 @@ class GattServerCallback(private val context: Context, private val sendResponse:
     ) {
         super.onCharacteristicWriteRequest(device, requestId, characteristic, preparedWrite, responseNeeded, offset, value)
         Log.d(this.javaClass.name, "onCharacteristicWriteRequest: $requestId $offset ${characteristic.uuid}")
+
+        if(characteristic.uuid == GattServerWorker.POST_BROADCAST_MESSAGE_CHARACTERISTIC_UUID) {
+            try {
+                val message = BroadcastMessagePBO.parseFrom(value)
+                serverProtocolLogic.receiveBroadcastMessage(message)
+            } catch (ex: Exception) {
+                System.err.println("Failed onCharacteristicWriteRequest: " + ex.message)
+            }
+        }
     }
 
     override fun onCharacteristicReadRequest(
@@ -45,12 +55,31 @@ class GattServerCallback(private val context: Context, private val sendResponse:
     ) {
         super.onCharacteristicReadRequest(device, requestId, offset, characteristic)
         Log.d(this.javaClass.name, "onCharacteristicReadRequest: $requestId $offset ${characteristic?.uuid}")
-        sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, "Hello world".encodeToByteArray())
-        // sendResponse(device!!, requestId, BluetoothGatt.GATT_READ_NOT_PERMITTED, offset, ByteArray(10))
-        /*if(requestId >= messages.size) {
-            sendResponse(device!!, requestId, BluetoothGatt.GATT_READ_NOT_PERMITTED, offset, ByteArray(0))
+
+        if(characteristic?.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_SYSTEM_CHAIN_HASH_CHARACTERISTIC_UUID) {
+            val hash = serverProtocolLogic.getBroadcastMessageChainHash(true).encodeToByteArray()
+            sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, hash.sliceArray(offset..<hash.size))
+            return
+        } else if(characteristic?.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_NON_SYSTEM_CHAIN_HASH_CHARACTERISTIC_UUID) {
+            val hash = serverProtocolLogic.getBroadcastMessageChainHash(false).encodeToByteArray()
+            sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, hash.sliceArray(offset..<hash.size))
+            return
+        } else if(characteristic?.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID) {
+            val bytes = serverProtocolLogic.getCurrentBroadcastMessageInfoList(true).toByteArray()
+            sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, bytes.sliceArray(offset..<bytes.size))
+            return
+        } else if(characteristic?.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_NON_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID) {
+            val bytes = serverProtocolLogic.getCurrentBroadcastMessageInfoList(false).toByteArray()
+            sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, bytes.sliceArray(offset..<bytes.size))
+            return
+        } else {
+            val bytes = serverProtocolLogic.getBroadcastMessage(characteristic!!.uuid.toString())?.toByteArray()
+            if(bytes == null) {
+                sendResponse(device!!, requestId, BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, offset, ByteArray(0))
+                return
+            }
+            sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, bytes.sliceArray(offset..<bytes.size))
             return
         }
-        sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, gson.toJson(messages[requestId]).toByteArray())*/
     }
 }

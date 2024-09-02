@@ -10,6 +10,7 @@ import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.strobel.emercast.GlobalInMemoryAppStateSingleton
 import com.strobel.emercast.ble.enums.GattRoleEnum
+import com.strobel.emercast.ble.protocol.ClientProtocolLogic
 
 class GattClientWorker(private val appContext: Context, workerParams: WorkerParameters): Worker(appContext, workerParams) {
     private val manager = appContext.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -19,10 +20,12 @@ class GattClientWorker(private val appContext: Context, workerParams: WorkerPara
 
     @SuppressLint("MissingPermission")
     override fun doWork(): Result {
+        val clientProtocolLogic = ClientProtocolLogic(applicationContext)
+
         val deviceAddress = inputData.getString("mac")
         val device = manager.adapter.getRemoteDevice(deviceAddress)
         Log.d(this.javaClass.name, "Connecting to device ${device.name} at ${device.address} of type ${device.type} with bondState ${device.bondState}")
-        gatt = device.connectGatt(appContext, false, GattClientCallback(appContext))
+        gatt = device.connectGatt(appContext, false, GattClientCallback(clientProtocolLogic))
         Log.d(this.javaClass.name, "Connect initialized")
 
         Thread.sleep(1000*15)

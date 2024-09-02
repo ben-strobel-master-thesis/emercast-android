@@ -14,6 +14,7 @@ import androidx.work.WorkerParameters
 import com.strobel.emercast.GlobalInMemoryAppStateSingleton
 import com.strobel.emercast.ble.BLEScanReceiver.Companion.GATT_SERVER_SERVICE_UUID
 import com.strobel.emercast.ble.enums.GattRoleEnum
+import com.strobel.emercast.ble.protocol.ServerProtocolLogic
 import java.util.UUID
 
 class GattServerWorker(private val appContext: Context, workerParams: WorkerParameters) : Worker(appContext, workerParams) {
@@ -29,7 +30,16 @@ class GattServerWorker(private val appContext: Context, workerParams: WorkerPara
     @SuppressLint("MissingPermission")
     override fun doWork(): Result {
         Log.d(this.javaClass.name, "${this.applicationContext}")
-        server = manager!!.openGattServer(this.applicationContext, GattServerCallback(this.applicationContext, ::sendResponse))
+        val serverProtocolLogic = ServerProtocolLogic(this.applicationContext)
+
+        server = manager!!.openGattServer(this.applicationContext, GattServerCallback(::sendResponse, serverProtocolLogic))
+
+        serverProtocolLogic.onServerStarted { id ->
+            addCharacteristicToService(
+                service,
+                UUID.fromString(id)
+            )
+        }
         server.addService(service)
 
         Thread.sleep(1000*20)
@@ -48,26 +58,30 @@ class GattServerWorker(private val appContext: Context, workerParams: WorkerPara
     }
 
     companion object {
-        private const val ACTUAL_16_BIT_NEW_MESSAGE_TO_SERVER_CHARACTERISTIC_UUID = "b572"
-        private const val ACTUAL_16_BIT_NEW_MESSAGE_TO_CLIENT_CHARACTERISTIC_UUID = "b573"
-        val NEW_MESSAGE_TO_SERVER_CHARACTERISTIC_UUID: UUID = UUID.fromString("0000$ACTUAL_16_BIT_NEW_MESSAGE_TO_SERVER_CHARACTERISTIC_UUID-0000-1000-8000-00805F9B34FB")
-        val NEW_MESSAGE_TO_CLIENT_CHARACTERISTIC_UUID: UUID = UUID.fromString("0000$ACTUAL_16_BIT_NEW_MESSAGE_TO_CLIENT_CHARACTERISTIC_UUID-0000-1000-8000-00805F9B34FB")
+        val GET_BROADCAST_MESSAGE_SYSTEM_CHAIN_HASH_CHARACTERISTIC_UUID: UUID = UUID.fromString("7323fe0e-5691-4090-0000-48b1782de633")
+        val GET_BROADCAST_MESSAGE_NON_SYSTEM_CHAIN_HASH_CHARACTERISTIC_UUID: UUID = UUID.fromString("7323fe0e-5691-4090-0001-48b1782de633")
 
-        private val messageToServerCharacteristic = BluetoothGattCharacteristic(
-            NEW_MESSAGE_TO_SERVER_CHARACTERISTIC_UUID,
-            BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_READ,
-            BluetoothGattCharacteristic.PERMISSION_WRITE or BluetoothGattCharacteristic.PERMISSION_READ
-        )
+        val GET_BROADCAST_MESSAGE_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID: UUID = UUID.fromString("7323fe0e-5691-4090-0002-48b1782de633")
+        val GET_BROADCAST_MESSAGE_NON_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID: UUID = UUID.fromString("7323fe0e-5691-4090-0003-48b1782de633")
 
-        private val messageToClientCharacteristic = BluetoothGattCharacteristic(
-            NEW_MESSAGE_TO_CLIENT_CHARACTERISTIC_UUID,
-            BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_READ,
-            BluetoothGattCharacteristic.PERMISSION_WRITE or BluetoothGattCharacteristic.PERMISSION_READ
-        )
+        val POST_BROADCAST_MESSAGE_CHARACTERISTIC_UUID: UUID = UUID.fromString("7323fe0e-5691-4090-0004-48b1782de633")
+
+        private fun addCharacteristicToService(service: BluetoothGattService, uuid: UUID) {
+            service.addCharacteristic(
+                BluetoothGattCharacteristic(
+                    uuid,
+                    BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_READ,
+                    BluetoothGattCharacteristic.PERMISSION_WRITE or BluetoothGattCharacteristic.PERMISSION_READ
+                )
+            )
+        }
 
         private val service = BluetoothGattService(GATT_SERVER_SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY).also {
-            it.addCharacteristic(messageToServerCharacteristic)
-            it.addCharacteristic(messageToClientCharacteristic)
+            addCharacteristicToService(it, GET_BROADCAST_MESSAGE_SYSTEM_CHAIN_HASH_CHARACTERISTIC_UUID)
+            addCharacteristicToService(it, GET_BROADCAST_MESSAGE_NON_SYSTEM_CHAIN_HASH_CHARACTERISTIC_UUID)
+            addCharacteristicToService(it, GET_BROADCAST_MESSAGE_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID)
+            addCharacteristicToService(it, GET_BROADCAST_MESSAGE_NON_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID)
+            addCharacteristicToService(it, POST_BROADCAST_MESSAGE_CHARACTERISTIC_UUID)
         }
     }
 }

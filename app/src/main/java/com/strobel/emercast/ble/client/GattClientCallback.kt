@@ -5,17 +5,19 @@ import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothProfile
-import android.content.Context
+import android.os.Build
 import android.util.Log
-import com.google.gson.Gson
+import androidx.annotation.RequiresApi
 import com.strobel.emercast.ble.BLEScanReceiver.Companion.GATT_SERVER_SERVICE_UUID
+import com.strobel.emercast.ble.protocol.ClientProtocolLogic
 import com.strobel.emercast.ble.server.GattServerWorker
-import com.strobel.emercast.db.EmercastDbHelper
-import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
+import com.strobel.emercast.protobuf.BroadcastMessageInfoListPBO
+import com.strobel.emercast.protobuf.BroadcastMessagePBO
+import java.util.UUID
+import java.util.function.Consumer
+import java.util.function.Function
 
-class GattClientCallback(context: Context): BluetoothGattCallback() {
-    private val dbHelper = EmercastDbHelper(context)
-    private val repo = BroadcastMessagesRepository(dbHelper)
+class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): BluetoothGattCallback() {
 
     @SuppressLint("MissingPermission")
     override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
@@ -33,25 +35,57 @@ class GattClientCallback(context: Context): BluetoothGattCallback() {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     @SuppressLint("MissingPermission")
     override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
         super.onServicesDiscovered(gatt, status)
 
         Log.d(this.javaClass.name, "onServicesDiscovered")
-        gatt?.services?.forEach { service ->
-            run {
-                Log.d(this.javaClass.name, "Service: ${service.uuid}")
-                service.characteristics.forEach { characteristic ->
-                    Log.d(this.javaClass.name,"Characteristic: ${characteristic.uuid}"
-                    )
-                }
-            }
+        if(gatt == null) return
+
+        val getMessageChainHash: Function<Boolean, String> = Function { systemMessage: Boolean ->
+            val service = gatt.getService(GATT_SERVER_SERVICE_UUID)
+            val characteristic = service.getCharacteristic(
+                if(systemMessage)
+                    GattServerWorker.GET_BROADCAST_MESSAGE_SYSTEM_CHAIN_HASH_CHARACTERISTIC_UUID
+                else
+                    GattServerWorker.GET_BROADCAST_MESSAGE_NON_SYSTEM_CHAIN_HASH_CHARACTERISTIC_UUID
+            )
+            gatt.readCharacteristic(characteristic)
+            characteristic.value.decodeToString()
         }
-        val discoveredService = gatt?.getService(GATT_SERVER_SERVICE_UUID) ?: return
-        Log.d(this.javaClass.name, "Own service not null")
-        val characteristic = discoveredService.getCharacteristic(GattServerWorker.NEW_MESSAGE_TO_CLIENT_CHARACTERISTIC_UUID)
-        val success = gatt.readCharacteristic(characteristic)
-        Log.d(this.javaClass.name, "Read Characteristic sucess: $success")
+
+        val getCurrentBroadcastMessageInfoList: Function<Boolean, BroadcastMessageInfoListPBO> = Function { systemMessage: Boolean ->
+            val service = gatt.getService(GATT_SERVER_SERVICE_UUID)
+            val characteristic = service.getCharacteristic(
+                if(systemMessage)
+                    GattServerWorker.GET_BROADCAST_MESSAGE_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID
+                else
+                    GattServerWorker.GET_BROADCAST_MESSAGE_NON_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID
+            )
+            gatt.readCharacteristic(characteristic)
+            BroadcastMessageInfoListPBO.parseFrom(characteristic.value)
+        }
+
+        val getBroadcastMessage: Function<String, BroadcastMessagePBO> = Function { id: String ->
+            val service = gatt.getService(GATT_SERVER_SERVICE_UUID)
+            val characteristic = service.getCharacteristic(UUID.fromString(id))
+            gatt.readCharacteristic(characteristic)
+            BroadcastMessagePBO.parseFrom(characteristic.value)
+        }
+
+        val writeBroadcastMessage: Consumer<BroadcastMessagePBO> = Consumer { message ->
+            val service = gatt.getService(GATT_SERVER_SERVICE_UUID)
+            val characteristic = service.getCharacteristic(GattServerWorker.POST_BROADCAST_MESSAGE_CHARACTERISTIC_UUID)
+            gatt.writeCharacteristic(characteristic,message.toByteArray(),BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
+        }
+
+        clientProtocolLogic.connectedToServer(
+            getMessageChainHash,
+            getCurrentBroadcastMessageInfoList,
+            getBroadcastMessage,
+            writeBroadcastMessage
+        )
     }
 
     override fun onCharacteristicRead(

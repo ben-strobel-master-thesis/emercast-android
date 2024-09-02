@@ -110,7 +110,7 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
     }
 
     private fun getFromCursor(cursor: Cursor): BroadcastMessage? {
-        if(cursor.isClosed || !cursor.moveToFirst()) return null
+        if(cursor.isClosed) return null
         return BroadcastMessage(
             cursor.getString(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_ID)),
             cursor.getLong(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_CREATED)),

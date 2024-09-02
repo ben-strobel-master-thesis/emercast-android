@@ -14,6 +14,7 @@ class ClientProtocolLogic(private val context: Context) {
 
     private val broadcastMessageService = BroadcastMessageService(EmercastDbHelper(context))
 
+    // TODO Get and respect MTU
     fun connectedToServer(
         getMessageChainHash: Function<Boolean, String>,
         getCurrentBroadcastMessageInfoList: Function<Boolean, BroadcastMessageInfoListPBO>,
