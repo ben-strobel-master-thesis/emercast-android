@@ -8,6 +8,7 @@ import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
 import com.strobel.emercast.protobuf.SystemBroadcastMessageAuthorityIssuedPayloadPBO
 import com.strobel.emercast.protobuf.SystemBroadcastMessageAuthorityRevokedPayloadPBO
 import java.security.KeyFactory
+import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 import java.security.PublicKey
 import java.security.spec.InvalidKeySpecException
@@ -68,11 +69,16 @@ class AuthorityService(dbHelper: EmercastDbHelper) {
     // The signed content must be provided within the message that is to be verified
     // The plain content must be calculated using the data in the message that is to be verified
     private fun verifyContentWasSignedByAuthority(signerAuthority: Authority, signedContent: String, plainContent: ByteArray): Boolean {
+        val md = MessageDigest.getInstance("SHA-256")
+        val plainHashedContent =  md.digest(plainContent)
+
         val signedBytes = Base64.getDecoder().decode(signedContent)
         val cipher = Cipher.getInstance("RSA");
         cipher.init(Cipher.DECRYPT_MODE, getPublicKey(signerAuthority))
-        val decryptedBytes = cipher.doFinal(signedBytes)
-        return decryptedBytes.contentEquals(plainContent)
+        var decryptedBytes = cipher.doFinal(signedBytes)
+        if(decryptedBytes.size < 255) return false
+        decryptedBytes = decryptedBytes.takeLast(32).toByteArray()
+        return decryptedBytes.contentEquals(plainHashedContent)
     }
 
     private fun getPublicKey(authority: Authority): PublicKey {

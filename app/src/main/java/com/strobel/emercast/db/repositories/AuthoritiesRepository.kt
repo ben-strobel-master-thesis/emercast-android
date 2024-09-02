@@ -51,13 +51,14 @@ class AuthoritiesRepository(private val dbHelper: EmercastDbHelper) {
             sortOrder
         );
 
+        if(!cursor.moveToFirst()) return null;
         val authority = getFromCursor(cursor)
         cursor.close()
         return authority
     }
 
     private fun getFromCursor(cursor: Cursor): Authority? {
-        if(cursor.isClosed || cursor.count == 0) return null
+        if(cursor.isClosed) return null
         return Authority(
             cursor.getString(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.AuthorityEntry.COLUMN_NAME_ID)),
             cursor.getLong(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.AuthorityEntry.COLUMN_NAME_CREATED)),

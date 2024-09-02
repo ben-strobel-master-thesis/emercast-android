@@ -34,7 +34,7 @@ class FCMService : FirebaseMessagingService() {
 
                 System.currentTimeMillis() / 1000,
                 true,
-                message.data.getValue("systemMessageRegardingAuthority"),
+                null,
                 null
             )
 

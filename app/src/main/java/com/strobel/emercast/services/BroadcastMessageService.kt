@@ -1,6 +1,7 @@
 package com.strobel.emercast.services
 
 import android.content.Context
+import android.widget.Toast
 import com.openapi.gen.android.api.DefaultApi
 import com.openapi.gen.android.dto.BroadcastMessageDTO
 import com.strobel.emercast.R
@@ -32,6 +33,7 @@ class BroadcastMessageService(private val dbHelper: EmercastDbHelper) {
                 pullPaginatedBroadcastMessagesFromServer(false, api, context)
             }
         } catch (ex: Exception) {
+            Toast.makeText(context, "Failed to pull messages from server", Toast.LENGTH_SHORT).show()
             ex.printStackTrace()
         }
     }
@@ -59,6 +61,8 @@ class BroadcastMessageService(private val dbHelper: EmercastDbHelper) {
     }
 
     fun handleBroadcastMessageReceived(broadcastMessage: BroadcastMessage, context: Context) {
+        if(broadcastMessagesRepository.findById(broadcastMessage.id) != null) return
+
         if(broadcastMessage.issuedAuthorityId == AuthorityService.ROOT_AUTHORITY_UUID) {
             if(authorityService.doesAuthorityExist(AuthorityService.ROOT_AUTHORITY_UUID, broadcastMessage.created)) {
                 if(!authorityService.verifyBroadcastMessage(broadcastMessage)) return

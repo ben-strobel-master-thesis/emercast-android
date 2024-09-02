@@ -56,7 +56,7 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
                 "(${EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_FORWARD_UNTIL_OVERRIDE} is null or " +
                 "${EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_FORWARD_UNTIL_OVERRIDE} > ?) and " +
                 "${EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_SYSTEM_MESSAGE} = ?"
-        val selectionArgs = arrayOf(""+now, ""+now, ""+systemMessage)
+        val selectionArgs = arrayOf(""+now, ""+now, if (systemMessage) ""+1 else ""+0)
         val sortOrder = "${EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_CREATED} DESC"
 
         val cursor = db.query(
@@ -90,6 +90,7 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
             null,
             null
         )
+        if(!cursor.moveToFirst()) return null;
         val result = getFromCursor(cursor)
         cursor.close()
         return result
@@ -111,7 +112,7 @@ class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
     }
 
     private fun getFromCursor(cursor: Cursor): BroadcastMessage? {
-        if(cursor.isClosed || cursor.count == 0) return null
+        if(cursor.isClosed || !cursor.moveToFirst()) return null
         return BroadcastMessage(
             cursor.getString(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_ID)),
             cursor.getLong(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.BroadcastMessageEntry.COLUMN_NAME_CREATED)),

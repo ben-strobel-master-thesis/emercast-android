@@ -68,7 +68,7 @@ class JurisdictionMarkersRepository(private val dbHelper: EmercastDbHelper) {
     }
 
     private fun getFromCursor(cursor: Cursor): JurisdictionMarker? {
-        if(cursor.isClosed || cursor.count == 0) return null
+        if(cursor.isClosed) return null
         return JurisdictionMarker(
             cursor.getString(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.JurisdictionMarkerEntry.COLUMN_NAME_AUTHORITY_ID)),
             cursor.getLong(cursor.getColumnIndexOrThrow(EmercastDbHelper.Companion.JurisdictionMarkerEntry.COLUMN_NAME_AUTHORITY_CREATED)),
