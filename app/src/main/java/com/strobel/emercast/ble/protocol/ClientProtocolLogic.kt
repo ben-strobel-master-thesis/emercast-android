@@ -14,7 +14,6 @@ class ClientProtocolLogic(private val context: Context) {
 
     private val broadcastMessageService = BroadcastMessageService(EmercastDbHelper(context))
 
-    // TODO Get and respect MTU
     fun connectedToServer(
         getMessageChainHash: Function<Boolean, String>,
         getCurrentBroadcastMessageInfoList: Function<Boolean, BroadcastMessageInfoListPBO>,
@@ -56,8 +55,22 @@ class ClientProtocolLogic(private val context: Context) {
         var remoteIndex = 0
 
         while (localIndex < localMessageList.size || remoteIndex < remoteMessageInfoList.size) {
-            val localElement = localMessageList[localIndex]
-            val remoteElement = remoteMessageInfoList[remoteIndex]
+            val localElement = if(localIndex < localMessageList.size) localMessageList[localIndex] else null
+            val remoteElement = if(remoteIndex < remoteMessageInfoList.size) remoteMessageInfoList[remoteIndex] else null
+
+            if(localElement == null && remoteElement == null) break
+
+            if(localElement == null || remoteElement == null) {
+                if(localElement == null) {
+                    broadcastMessageService.handleBroadcastMessageReceived(getBroadcastMessage.apply(remoteElement!!.id).toDBO(), context)
+                    remoteIndex++
+                }
+                if(remoteElement == null) {
+                    writeBroadcastMessage.accept(localElement!!.toPBO())
+                    localIndex++
+                }
+                continue
+            }
 
             if(localElement.created == remoteElement.created) {
                 localIndex++
