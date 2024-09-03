@@ -1,6 +1,7 @@
 package com.strobel.emercast.ble.protocol
 
 import android.content.Context
+import android.content.Intent
 import com.strobel.emercast.db.EmercastDbHelper
 import com.strobel.emercast.protobuf.BroadcastMessageInfoListPBO
 import com.strobel.emercast.protobuf.BroadcastMessagePBO
@@ -37,5 +38,9 @@ class ServerProtocolLogic(private val context: Context) {
 
     fun receiveBroadcastMessage(message: BroadcastMessagePBO) {
         broadcastMessageService.handleBroadcastMessageReceived(message.toDBO(), context)
+        Intent().also { intent ->
+            intent.setAction("com.strobel.emercast.NEW_BROADCAST_MESSAGE")
+            context.sendBroadcast(intent)
+        }
     }
 }

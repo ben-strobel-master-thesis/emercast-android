@@ -1,6 +1,8 @@
 package com.strobel.emercast.ble.protocol
 
 import android.content.Context
+import android.content.Intent
+import android.util.Log
 import com.strobel.emercast.db.EmercastDbHelper
 import com.strobel.emercast.protobuf.BroadcastMessageInfoListPBO
 import com.strobel.emercast.protobuf.BroadcastMessagePBO
@@ -42,6 +44,7 @@ class ClientProtocolLogic(private val context: Context) {
     ) {
         var localMessageList = broadcastMessageService.getAllMessages(systemMessage)
         var remoteMessageInfoList = getCurrentBroadcastMessageInfoList.apply(systemMessage).messagesList
+        var addedMessages = 0
 
         if(systemMessage) {
             localMessageList = localMessageList.sortedBy { it.created }
@@ -63,6 +66,7 @@ class ClientProtocolLogic(private val context: Context) {
             if(localElement == null || remoteElement == null) {
                 if(localElement == null) {
                     broadcastMessageService.handleBroadcastMessageReceived(getBroadcastMessage.apply(remoteElement!!.id).toDBO(), context)
+                    addedMessages++
                     remoteIndex++
                 }
                 if(remoteElement == null) {
@@ -78,6 +82,7 @@ class ClientProtocolLogic(private val context: Context) {
 
                 if(localElement.id != remoteElement.id) {
                     broadcastMessageService.handleBroadcastMessageReceived(getBroadcastMessage.apply(remoteElement.id).toDBO(), context)
+                    addedMessages++
                     writeBroadcastMessage.accept(localElement.toPBO())
                 }
 
@@ -87,8 +92,15 @@ class ClientProtocolLogic(private val context: Context) {
                 localIndex++
             } else {
                 broadcastMessageService.handleBroadcastMessageReceived(getBroadcastMessage.apply(remoteElement.id).toDBO(), context)
+                addedMessages++
                 remoteIndex++
             }
+        }
+        Log.d(this.javaClass.name, "Finished syncBroadcastMessages")
+
+        Intent().also { intent ->
+            intent.setAction("com.strobel.emercast.NEW_BROADCAST_MESSAGE")
+            context.sendBroadcast(intent)
         }
     }
 }
