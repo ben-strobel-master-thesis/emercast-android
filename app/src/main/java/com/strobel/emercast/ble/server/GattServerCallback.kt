@@ -14,7 +14,7 @@ class GattServerCallback(
     private val serverProtocolLogic: ServerProtocolLogic
 ): BluetoothGattServerCallback() {
 
-    private val writeCacheCharacteristics: HashMap<String, ByteArray> = HashMap()
+    private val characteristicWriteValueMap: HashMap<String, ByteArray> = HashMap()
 
     private var mtu = 24
 
@@ -46,11 +46,16 @@ class GattServerCallback(
         Log.d(this.javaClass.name, "onCharacteristicWriteRequest: $requestId $offset ${characteristic.uuid}")
 
         if(characteristic.uuid == GattServerWorker.POST_BROADCAST_MESSAGE_CHARACTERISTIC_UUID) {
-            try {
-                val message = BroadcastMessagePBO.parseFrom(value)
-                serverProtocolLogic.receiveBroadcastMessage(message)
-            } catch (ex: Exception) {
-                Log.e(this.javaClass.name, "Failed onCharacteristicWriteRequest: " + ex.message)
+            var existingValue = characteristicWriteValueMap[characteristic.uuid.toString()] ?: ByteArray(0)
+            existingValue += value
+            characteristicWriteValueMap[characteristic.uuid.toString()] = existingValue
+            if(existingValue.size >= 4 && existingValue.size >= ByteBuffer.allocate(Int.SIZE_BYTES).put(existingValue.copyOfRange(0, Int.SIZE_BYTES)).getInt(0)) {
+                try {
+                    val message = BroadcastMessagePBO.parseFrom(characteristicWriteValueMap.remove(characteristic.uuid.toString()))
+                    serverProtocolLogic.receiveBroadcastMessage(message)
+                } catch (ex: Exception) {
+                    Log.e(this.javaClass.name, "Failed onCharacteristicWriteRequest: " + ex.message)
+                }
             }
         }else if(characteristic.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_SYSTEM_CHAIN_HASH_CHARACTERISTIC_UUID) {
             sendCharacteristic({serverProtocolLogic.getBroadcastMessageChainHash(true).encodeToByteArray()}, {sendResponse(device, characteristic, it)})

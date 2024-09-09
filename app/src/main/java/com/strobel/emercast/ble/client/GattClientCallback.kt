@@ -11,7 +11,6 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import com.strobel.emercast.ble.BLEScanReceiver.Companion.GATT_SERVER_SERVICE_UUID
 import com.strobel.emercast.ble.protocol.ClientProtocolLogic
-import com.strobel.emercast.ble.server.GattServerCallback
 import com.strobel.emercast.ble.server.GattServerCallback.Companion.CHARACTERISTIC_CHUNK_SIZE
 import com.strobel.emercast.ble.server.GattServerWorker
 import com.strobel.emercast.protobuf.BroadcastMessageInfoListPBO
@@ -22,12 +21,13 @@ import java.util.concurrent.TimeoutException
 import java.util.function.Consumer
 import java.util.function.Function
 import kotlin.concurrent.thread
+import kotlin.math.min
 
 class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): BluetoothGattCallback() {
 
     private val lock = Object()
     private val lockMtu = Object()
-    private val characteristicValueMap: HashMap<String, ByteArray> = HashMap()
+    private val characteristicReadValueMap: HashMap<String, ByteArray> = HashMap()
     private var mtu = 23
 
     @SuppressLint("MissingPermission")
@@ -81,9 +81,9 @@ class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): 
     ) {
         super.onCharacteristicChanged(gatt, characteristic, value)
         Log.d(this.javaClass.name, "onCharacteristicChanged $characteristic ${value.size}")
-        var existingValue = characteristicValueMap[characteristic.uuid.toString()] ?: ByteArray(0)
+        var existingValue = characteristicReadValueMap[characteristic.uuid.toString()] ?: ByteArray(0)
         existingValue += value
-        characteristicValueMap[characteristic.uuid.toString()] = existingValue
+        characteristicReadValueMap[characteristic.uuid.toString()] = existingValue
         if(existingValue.size >= 4 && existingValue.size >= ByteBuffer.allocate(Int.SIZE_BYTES).put(existingValue.copyOfRange(0, Int.SIZE_BYTES)).getInt(0)) {
             synchronized(lock) {
                 lock.notifyAll()
@@ -115,6 +115,7 @@ class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): 
     @SuppressLint("MissingPermission")
     private fun initiateProtocol(gatt: BluetoothGatt, service: BluetoothGattService) {
         val getMessageChainHash: Function<Boolean, String> = Function { systemMessage: Boolean ->
+            Log.d(this.javaClass.name, "Getting message chain hash")
             val characteristic = service.getCharacteristic(
                 if(systemMessage)
                     GattServerWorker.GET_BROADCAST_MESSAGE_SYSTEM_CHAIN_HASH_CHARACTERISTIC_UUID
@@ -126,6 +127,7 @@ class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): 
         }
 
         val getCurrentBroadcastMessageInfoList: Function<Boolean, BroadcastMessageInfoListPBO> = Function { systemMessage: Boolean ->
+            Log.d(this.javaClass.name, "Getting broadcast message info list")
             val characteristic = service.getCharacteristic(
                 if(systemMessage)
                     GattServerWorker.GET_BROADCAST_MESSAGE_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID
@@ -137,15 +139,31 @@ class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): 
         }
 
         val getBroadcastMessage: Function<String, BroadcastMessagePBO> = Function { id: String ->
+            Log.d(this.javaClass.name, "Getting message: $id")
             val characteristic = service.getCharacteristic(UUID.fromString(id))
             val result = readCharacteristics(gatt, characteristic)
             BroadcastMessagePBO.parseFrom(result)
         }
 
-        // TODO Get and respect MTU
         val writeBroadcastMessage: Consumer<BroadcastMessagePBO> = Consumer { message ->
+            Log.d(this.javaClass.name, "Writing Broadcast Message: ${message.id}")
             val characteristic = service.getCharacteristic(GattServerWorker.POST_BROADCAST_MESSAGE_CHARACTERISTIC_UUID)
-            gatt.writeCharacteristic(characteristic,message.toByteArray(),BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
+            val value = message.toByteArray()
+            Log.d(this.javaClass.name, "MTU for this read is ${this.mtu}")
+            val chunkSize = this.mtu - 3
+            var chunk = ByteBuffer.allocate(Int.SIZE_BYTES).putInt(value.size).array()
+            var offset = 0
+
+            Log.d(this.javaClass.name, "Starting to transmit characteristic. Total size: ${value.size} Value: ${value.decodeToString()}")
+            while(offset < value.size) {
+                val upperBound = min(value.size, offset - (if (offset == 0) Int.SIZE_BYTES else 0 ) + chunkSize)
+                chunk += value.copyOfRange(offset, upperBound)
+                offset = upperBound
+                val result = gatt.writeCharacteristic(characteristic,message.toByteArray(),BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) // Requiring ack -> packets arrive in order
+                Log.d(this.javaClass.name, "Sent chunk with size: ${chunk.size} new offset: $offset result: $result")
+                chunk = ByteArray(0)
+            }
+            Log.d(this.javaClass.name, "Finished transmitting characteristic")
         }
 
         thread {
@@ -184,7 +202,7 @@ class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): 
             try {
                 lock.wait(timeoutMs)
             } catch (_: InterruptedException) {}
-            val value = characteristicValueMap.remove(characteristic.uuid.toString())
+            val value = characteristicReadValueMap.remove(characteristic.uuid.toString())
             Log.d(this.javaClass.name, "Finished receiving characteristic. Received: ${value?.decodeToString()}")
             return value?.sliceArray(4..<value.size)
         }
