@@ -46,12 +46,14 @@ class GattServerCallback(
         Log.d(this.javaClass.name, "onCharacteristicWriteRequest: $requestId $offset ${characteristic.uuid}")
 
         if(characteristic.uuid == GattServerWorker.POST_BROADCAST_MESSAGE_CHARACTERISTIC_UUID) {
+            Log.d(this.javaClass.name, "Receiving broadcast message from client: ${characteristic.uuid} size: ${value.size}")
             var existingValue = characteristicWriteValueMap[characteristic.uuid.toString()] ?: ByteArray(0)
             existingValue += value
             characteristicWriteValueMap[characteristic.uuid.toString()] = existingValue
             if(existingValue.size >= 4 && existingValue.size >= ByteBuffer.allocate(Int.SIZE_BYTES).put(existingValue.copyOfRange(0, Int.SIZE_BYTES)).getInt(0)) {
                 try {
-                    val message = BroadcastMessagePBO.parseFrom(characteristicWriteValueMap.remove(characteristic.uuid.toString()))
+                    val messageBytes = characteristicWriteValueMap.remove(characteristic.uuid.toString())
+                    val message = BroadcastMessagePBO.parseFrom(messageBytes?.sliceArray(4..<messageBytes.size))
                     serverProtocolLogic.receiveBroadcastMessage(message)
                 } catch (ex: Exception) {
                     Log.e(this.javaClass.name, "Failed onCharacteristicWriteRequest: " + ex.message)

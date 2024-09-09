@@ -159,7 +159,7 @@ class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): 
                 val upperBound = min(value.size, offset - (if (offset == 0) Int.SIZE_BYTES else 0 ) + chunkSize)
                 chunk += value.copyOfRange(offset, upperBound)
                 offset = upperBound
-                val result = gatt.writeCharacteristic(characteristic,message.toByteArray(),BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) // Requiring ack -> packets arrive in order
+                val result = gatt.writeCharacteristic(characteristic,chunk,BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) // Requiring ack -> packets arrive in order
                 Log.d(this.javaClass.name, "Sent chunk with size: ${chunk.size} new offset: $offset result: $result")
                 chunk = ByteArray(0)
             }
