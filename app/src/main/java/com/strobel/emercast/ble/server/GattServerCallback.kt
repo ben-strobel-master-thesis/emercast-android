@@ -1,25 +1,28 @@
 package com.strobel.emercast.ble.server
 
 import android.bluetooth.BluetoothDevice
-import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattServerCallback
 import android.util.Log
 import com.strobel.emercast.ble.protocol.ServerProtocolLogic
 import com.strobel.emercast.protobuf.BroadcastMessagePBO
-import java.util.HashMap
-import kotlin.math.floor
+import java.nio.ByteBuffer
 import kotlin.math.min
 
 class GattServerCallback(
-    private val sendResponse: (BluetoothDevice, Int, Int, Int, ByteArray) -> Boolean,
+    private val sendResponse: (BluetoothDevice, BluetoothGattCharacteristic, ByteArray) -> Int,
     private val serverProtocolLogic: ServerProtocolLogic
 ): BluetoothGattServerCallback() {
 
-    // Accelerating offset read operations
-    // Cached elements are currently never updated during a connection and are only read once so don't need to be invalidated / updated
-    private val readCacheCharacteristics: HashMap<String, Pair<ByteArray, Int>> = HashMap()
-    private val writeCacheCharacteristics: HashMap<String, Pair<ByteArray, Int>> = HashMap()
+    private val writeCacheCharacteristics: HashMap<String, ByteArray> = HashMap()
+
+    private var mtu = 24
+
+    override fun onMtuChanged(device: BluetoothDevice?, mtu: Int) {
+        super.onMtuChanged(device, mtu)
+        Log.d(this.javaClass.name, "onMtuChanged: $mtu")
+        this.mtu = mtu
+    }
 
     override fun onConnectionStateChange(
         device: BluetoothDevice,
@@ -49,11 +52,29 @@ class GattServerCallback(
             } catch (ex: Exception) {
                 Log.e(this.javaClass.name, "Failed onCharacteristicWriteRequest: " + ex.message)
             }
+        }else if(characteristic.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_SYSTEM_CHAIN_HASH_CHARACTERISTIC_UUID) {
+            sendCharacteristic({serverProtocolLogic.getBroadcastMessageChainHash(true).encodeToByteArray()}, {sendResponse(device, characteristic, it)})
+        } else if(characteristic.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_NON_SYSTEM_CHAIN_HASH_CHARACTERISTIC_UUID) {
+            sendCharacteristic({serverProtocolLogic.getBroadcastMessageChainHash(false).encodeToByteArray()}, {sendResponse(device, characteristic, it)})
+            return
+        } else if(characteristic.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID) {
+            sendCharacteristic({serverProtocolLogic.getCurrentBroadcastMessageInfoList(true).toByteArray()}, {sendResponse(device, characteristic, it)})
+            return
+        } else if(characteristic.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_NON_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID) {
+            sendCharacteristic({serverProtocolLogic.getCurrentBroadcastMessageInfoList(false).toByteArray()}, {sendResponse(device, characteristic, it)})
+            return
+        } else {
+            try {
+                sendCharacteristic({serverProtocolLogic.getBroadcastMessage(characteristic.uuid.toString())!!.toByteArray()}, {sendResponse(device, characteristic, it)})
+            } catch (ex: Exception) {
+                Log.e(this.javaClass.name, ex.stackTraceToString())
+                sendResponse(device, characteristic, ByteArray(0))
+                return
+            }
+            return
         }
     }
 
-
-    // TODO Should also work with other MTUs, currently will only work with MTU of 257 (256 payload) because otherwise bytes will be skipped when reading across the borders of multiples 512 (max characeristics size)
     override fun onCharacteristicReadRequest(
         device: BluetoothDevice?,
         requestId: Int,
@@ -62,79 +83,25 @@ class GattServerCallback(
     ) {
         super.onCharacteristicReadRequest(device, requestId, offset, characteristic)
         Log.d(this.javaClass.name, "onCharacteristicReadRequest: $requestId $offset ${characteristic?.uuid}")
-
-        if(characteristic?.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_SYSTEM_CHAIN_HASH_CHARACTERISTIC_UUID) {
-            val value = readCachedCharacteristic(
-                readCacheCharacteristics[characteristic.uuid.toString()],
-                {if(it == null) readCacheCharacteristics.remove(characteristic.uuid.toString()) else readCacheCharacteristics[characteristic.uuid.toString()] = it},
-                {serverProtocolLogic.getBroadcastMessageChainHash(true).encodeToByteArray()}
-            )
-            sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
-            return
-        } else if(characteristic?.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_NON_SYSTEM_CHAIN_HASH_CHARACTERISTIC_UUID) {
-            val value = readCachedCharacteristic(
-                readCacheCharacteristics[characteristic.uuid.toString()],
-                {if(it == null) readCacheCharacteristics.remove(characteristic.uuid.toString()) else readCacheCharacteristics[characteristic.uuid.toString()] = it},
-                {serverProtocolLogic.getBroadcastMessageChainHash(false).encodeToByteArray()}
-            )
-            sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
-            return
-        } else if(characteristic?.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID) {
-            val value = readCachedCharacteristic(
-                readCacheCharacteristics[characteristic.uuid.toString()],
-                {if(it == null) readCacheCharacteristics.remove(characteristic.uuid.toString()) else readCacheCharacteristics[characteristic.uuid.toString()] = it},
-                {serverProtocolLogic.getCurrentBroadcastMessageInfoList(true).toByteArray()}
-            )
-            sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
-            return
-        } else if(characteristic?.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_NON_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID) {
-            val value = readCachedCharacteristic(
-                readCacheCharacteristics[characteristic.uuid.toString()],
-                {if(it == null) readCacheCharacteristics.remove(characteristic.uuid.toString()) else readCacheCharacteristics[characteristic.uuid.toString()] = it},
-                {serverProtocolLogic.getCurrentBroadcastMessageInfoList(false).toByteArray()}
-            )
-            sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
-            return
-        } else {
-            try {
-                val value = readCachedCharacteristic(
-                    readCacheCharacteristics[characteristic!!.uuid.toString()],
-                    {if(it == null) readCacheCharacteristics.remove(characteristic.uuid.toString()) else readCacheCharacteristics[characteristic.uuid.toString()] = it},
-                    {serverProtocolLogic.getBroadcastMessage(characteristic.uuid.toString())!!.toByteArray()}
-                )
-                sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
-            } catch (ex: Exception) {
-                Log.e(this.javaClass.name, ex.stackTraceToString())
-                sendResponse(device!!, requestId, BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, offset, ByteArray(0))
-                return
-            }
-            return
-        }
     }
 
-    private fun readCachedCharacteristic(value: Pair<ByteArray, Int>?, setValue: (Pair<ByteArray, Int>?) -> Unit, valueGetter: () -> ByteArray): ByteArray {
-        val currentValue = value?.first ?: valueGetter()
-        val currentPair = value ?: Pair(currentValue, currentValue.size)
-        if(value == null) setValue(currentPair)
+    private fun sendCharacteristic(valueGetter: () -> ByteArray, sendResponse: (ByteArray) -> Int) {
+        val value = valueGetter()
+        Log.d(this.javaClass.name, "MTU for this read is ${this.mtu}")
+        val chunkSize = this.mtu - 3
+        var chunk = ByteBuffer.allocate(Int.SIZE_BYTES).putInt(value.size).array()
+        var offset = 0
 
-        Log.d(this.javaClass.name, "Before reading chunk, remaining size: ${currentValue.size} total size: ${currentPair.second} was null before: ${value == null}")
-
-        val readUntilNow = currentPair.second - currentPair.first.size
-        val next512ByteBorder = (floor(readUntilNow.toDouble()/512)+1).toInt()// Dont read across 512 byte borders, because client must read in 512 byte chunks, independent of MTU size
-        val bytesUntilNextBorder = next512ByteBorder - readUntilNow
-
-        val returnValue = currentValue.sliceArray(0..<currentValue.size.coerceAtMost(min(CHARACTERISTIC_CHUNK_SIZE, bytesUntilNextBorder)))
-
-        if(currentValue.size > returnValue.size) {
-            val updated = currentValue.sliceArray(returnValue.size..<currentValue.size)
-            Log.d(this.javaClass.name, "Returning size: ${returnValue.size} remaining size: ${updated.size}")
-            setValue(Pair(updated, currentPair.second))
-        } else {
-            setValue(Pair(ByteArray(0), currentPair.second))
-            Log.d(this.javaClass.name, "Returning size: ${returnValue.size} remaining size: null")
+        Log.d(this.javaClass.name, "Starting to transmit characteristic. Total size: ${value.size} Value: ${value.decodeToString()}")
+        while(offset < value.size) {
+            val upperBound = min(value.size, offset - (if (offset == 0) Int.SIZE_BYTES else 0 ) + chunkSize)
+            chunk += value.copyOfRange(offset, upperBound)
+            offset = upperBound
+            val result = sendResponse(chunk)
+            Log.d(this.javaClass.name, "Sent chunk with size: ${chunk.size} new offset: $offset result: $result")
+            chunk = ByteArray(0)
         }
-
-        return returnValue
+        Log.d(this.javaClass.name, "Finished transmitting characteristic")
     }
 
     companion object {

@@ -23,8 +23,8 @@ class GattServerWorker(private val appContext: Context, workerParams: WorkerPara
     private val globalAppStateSingleton = GlobalInMemoryAppStateSingleton.getInstance()
 
     @SuppressLint("MissingPermission")
-    private fun sendResponse(device: BluetoothDevice, requestId: Int, status: Int, offset: Int, value: ByteArray): Boolean {
-        return server.sendResponse(device, requestId, status, offset, value)
+    private fun sendResponse(device: BluetoothDevice, characteristic: BluetoothGattCharacteristic, value: ByteArray): Int {
+        return server.notifyCharacteristicChanged(device, characteristic, true, value)
     }
 
     @SuppressLint("MissingPermission")
@@ -70,7 +70,7 @@ class GattServerWorker(private val appContext: Context, workerParams: WorkerPara
             service.addCharacteristic(
                 BluetoothGattCharacteristic(
                     uuid,
-                    BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_READ,
+                    BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_INDICATE,
                     BluetoothGattCharacteristic.PERMISSION_WRITE or BluetoothGattCharacteristic.PERMISSION_READ
                 )
             )

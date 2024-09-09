@@ -12,10 +12,11 @@ import androidx.annotation.RequiresApi
 import com.strobel.emercast.ble.BLEScanReceiver.Companion.GATT_SERVER_SERVICE_UUID
 import com.strobel.emercast.ble.protocol.ClientProtocolLogic
 import com.strobel.emercast.ble.server.GattServerCallback
+import com.strobel.emercast.ble.server.GattServerCallback.Companion.CHARACTERISTIC_CHUNK_SIZE
 import com.strobel.emercast.ble.server.GattServerWorker
 import com.strobel.emercast.protobuf.BroadcastMessageInfoListPBO
 import com.strobel.emercast.protobuf.BroadcastMessagePBO
-import java.util.HashMap
+import java.nio.ByteBuffer
 import java.util.UUID
 import java.util.concurrent.TimeoutException
 import java.util.function.Consumer
@@ -73,6 +74,23 @@ class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): 
         initiateProtocol(gatt, service)
     }
 
+    override fun onCharacteristicChanged(
+        gatt: BluetoothGatt,
+        characteristic: BluetoothGattCharacteristic,
+        value: ByteArray
+    ) {
+        super.onCharacteristicChanged(gatt, characteristic, value)
+        Log.d(this.javaClass.name, "onCharacteristicChanged $characteristic ${value.size}")
+        var existingValue = characteristicValueMap[characteristic.uuid.toString()] ?: ByteArray(0)
+        existingValue += value
+        characteristicValueMap[characteristic.uuid.toString()] = existingValue
+        if(existingValue.size >= 4 && existingValue.size >= ByteBuffer.allocate(Int.SIZE_BYTES).put(existingValue.copyOfRange(0, Int.SIZE_BYTES)).getInt(0)) {
+            synchronized(lock) {
+                lock.notifyAll()
+            }
+        }
+    }
+
     override fun onCharacteristicRead(
         gatt: BluetoothGatt,
         characteristic: BluetoothGattCharacteristic,
@@ -81,10 +99,6 @@ class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): 
     ) {
         super.onCharacteristicRead(gatt, characteristic, value, status)
         Log.d(this.javaClass.name, "onCharacteristicRead $status ${value.decodeToString()}")
-        synchronized(lock) {
-            characteristicValueMap[characteristic.uuid.toString()] = value
-            lock.notifyAll()
-        }
     }
 
     override fun onMtuChanged(gatt: BluetoothGatt?, mtu: Int, status: Int) {
@@ -136,7 +150,7 @@ class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): 
 
         thread {
             try {
-                gatt.requestMtu(257) // so payload will be 256 bytes large
+                gatt.requestMtu(CHARACTERISTIC_CHUNK_SIZE+3) // so payload will be 256 bytes large
                 synchronized(lockMtu) {
                     try {
                         lockMtu.wait(2000)
@@ -158,33 +172,21 @@ class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): 
 
     @SuppressLint("MissingPermission")
     private fun readCharacteristics(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic): ByteArray {
-        var result = ByteArray(0)
-        var intermediary = ByteArray(0)
-        var first = true
-
-        while(first || intermediary.size >= GattServerCallback.CHARACTERISTIC_CHUNK_SIZE) {
-            first = false
-            gatt.readCharacteristic(characteristic) // Increasing the offset is being handled by the server (the android api doesn't expose this to the client)
-            intermediary = waitForResponse(characteristic) ?: throw TimeoutException("Server didn't respond within timeout")
-            Log.d(this.javaClass.name, "Did request against ${characteristic.uuid} responseSize: ${intermediary.size} totalSize: ${result.size}")
-            result = result.plus(intermediary)
-        }
-
-        return result
+        gatt.setCharacteristicNotification(characteristic, true)
+        gatt.writeCharacteristic(characteristic, ByteArray(0), BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
+        val response = waitForResponse(characteristic) ?: throw TimeoutException("Server didn't respond within timeout")
+        gatt.setCharacteristicNotification(characteristic, false)
+        return response
     }
 
     private fun waitForResponse(characteristic: BluetoothGattCharacteristic, timeoutMs: Long = 3000): ByteArray? {
         synchronized(lock) {
-            if(characteristicValueMap.containsKey(characteristic.uuid.toString())) {
-                return characteristicValueMap.remove(characteristic.uuid.toString())
-            }
             try {
                 lock.wait(timeoutMs)
             } catch (_: InterruptedException) {}
-            if(characteristicValueMap.containsKey(characteristic.uuid.toString())) {
-                return characteristicValueMap.remove(characteristic.uuid.toString())
-            }
-            return null
+            val value = characteristicValueMap.remove(characteristic.uuid.toString())
+            Log.d(this.javaClass.name, "Finished receiving characteristic. Received: ${value?.decodeToString()}")
+            return value?.sliceArray(4..<value.size)
         }
     }
 }
