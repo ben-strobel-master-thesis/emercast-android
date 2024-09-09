@@ -8,6 +8,8 @@ import android.util.Log
 import com.strobel.emercast.ble.protocol.ServerProtocolLogic
 import com.strobel.emercast.protobuf.BroadcastMessagePBO
 import java.util.HashMap
+import kotlin.math.floor
+import kotlin.math.min
 
 class GattServerCallback(
     private val sendResponse: (BluetoothDevice, Int, Int, Int, ByteArray) -> Boolean,
@@ -15,14 +17,9 @@ class GattServerCallback(
 ): BluetoothGattServerCallback() {
 
     // Accelerating offset read operations
-    // Cached elements are currently never updated during a connection so don't need to be invalidated / updated
-    private var cachedMessageChainSystemHash: ByteArray? = null
-    private var cachedMessageChainNonSystemHash: ByteArray? = null
-    private var cachedMessageInfoListSystem: ByteArray? = null
-    private var cachedMessageInfoListNonSystem: ByteArray? = null
-    private val cachedBroadcastMessages: HashMap<String, ByteArray> = HashMap()
-
-    private var cachedWriteBroadcastMessage = ByteArray(0)
+    // Cached elements are currently never updated during a connection and are only read once so don't need to be invalidated / updated
+    private val readCacheCharacteristics: HashMap<String, Pair<ByteArray, Int>> = HashMap()
+    private val writeCacheCharacteristics: HashMap<String, Pair<ByteArray, Int>> = HashMap()
 
     override fun onConnectionStateChange(
         device: BluetoothDevice,
@@ -68,32 +65,32 @@ class GattServerCallback(
 
         if(characteristic?.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_SYSTEM_CHAIN_HASH_CHARACTERISTIC_UUID) {
             val value = readCachedCharacteristic(
-                cachedMessageChainSystemHash,
-                {cachedMessageChainSystemHash = it},
+                readCacheCharacteristics[characteristic.uuid.toString()],
+                {if(it == null) readCacheCharacteristics.remove(characteristic.uuid.toString()) else readCacheCharacteristics[characteristic.uuid.toString()] = it},
                 {serverProtocolLogic.getBroadcastMessageChainHash(true).encodeToByteArray()}
             )
             sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
             return
         } else if(characteristic?.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_NON_SYSTEM_CHAIN_HASH_CHARACTERISTIC_UUID) {
             val value = readCachedCharacteristic(
-                cachedMessageChainNonSystemHash,
-                {cachedMessageChainNonSystemHash = it},
+                readCacheCharacteristics[characteristic.uuid.toString()],
+                {if(it == null) readCacheCharacteristics.remove(characteristic.uuid.toString()) else readCacheCharacteristics[characteristic.uuid.toString()] = it},
                 {serverProtocolLogic.getBroadcastMessageChainHash(false).encodeToByteArray()}
             )
             sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
             return
         } else if(characteristic?.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID) {
             val value = readCachedCharacteristic(
-                cachedMessageInfoListSystem,
-                {cachedMessageInfoListSystem = it},
+                readCacheCharacteristics[characteristic.uuid.toString()],
+                {if(it == null) readCacheCharacteristics.remove(characteristic.uuid.toString()) else readCacheCharacteristics[characteristic.uuid.toString()] = it},
                 {serverProtocolLogic.getCurrentBroadcastMessageInfoList(true).toByteArray()}
             )
             sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
             return
         } else if(characteristic?.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_NON_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID) {
             val value = readCachedCharacteristic(
-                cachedMessageInfoListNonSystem,
-                {cachedMessageInfoListNonSystem = it},
+                readCacheCharacteristics[characteristic.uuid.toString()],
+                {if(it == null) readCacheCharacteristics.remove(characteristic.uuid.toString()) else readCacheCharacteristics[characteristic.uuid.toString()] = it},
                 {serverProtocolLogic.getCurrentBroadcastMessageInfoList(false).toByteArray()}
             )
             sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
@@ -101,8 +98,8 @@ class GattServerCallback(
         } else {
             try {
                 val value = readCachedCharacteristic(
-                    cachedBroadcastMessages[characteristic!!.uuid.toString()],
-                    {if(it == null) cachedBroadcastMessages.remove(characteristic.uuid.toString()) else cachedBroadcastMessages[characteristic.uuid.toString()] = it},
+                    readCacheCharacteristics[characteristic!!.uuid.toString()],
+                    {if(it == null) readCacheCharacteristics.remove(characteristic.uuid.toString()) else readCacheCharacteristics[characteristic.uuid.toString()] = it},
                     {serverProtocolLogic.getBroadcastMessage(characteristic.uuid.toString())!!.toByteArray()}
                 )
                 sendResponse(device!!, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
@@ -115,20 +112,25 @@ class GattServerCallback(
         }
     }
 
-    private fun readCachedCharacteristic(value: ByteArray?, setValue: (ByteArray?) -> Unit, valueGetter: () -> ByteArray): ByteArray {
-        val currentValue = value ?: valueGetter()
-        if(value == null) setValue(currentValue)
+    private fun readCachedCharacteristic(value: Pair<ByteArray, Int>?, setValue: (Pair<ByteArray, Int>?) -> Unit, valueGetter: () -> ByteArray): ByteArray {
+        val currentValue = value?.first ?: valueGetter()
+        val currentPair = value ?: Pair(currentValue, currentValue.size)
+        if(value == null) setValue(currentPair)
 
-        Log.d(this.javaClass.name, "Before reading chunk, remaining size: ${currentValue.size} was null before: ${value == null}")
+        Log.d(this.javaClass.name, "Before reading chunk, remaining size: ${currentValue.size} total size: ${currentPair.second} was null before: ${value == null}")
 
-        val returnValue = currentValue.sliceArray(0..<currentValue.size.coerceAtMost(CHARACTERISTIC_CHUNK_SIZE))
+        val readUntilNow = currentPair.second - currentPair.first.size
+        val next512ByteBorder = (floor(readUntilNow.toDouble()/512)+1).toInt()// Dont read across 512 byte borders, because client must read in 512 byte chunks, independent of MTU size
+        val bytesUntilNextBorder = next512ByteBorder - readUntilNow
+
+        val returnValue = currentValue.sliceArray(0..<currentValue.size.coerceAtMost(min(CHARACTERISTIC_CHUNK_SIZE, bytesUntilNextBorder)))
 
         if(currentValue.size > returnValue.size) {
             val updated = currentValue.sliceArray(returnValue.size..<currentValue.size)
             Log.d(this.javaClass.name, "Returning size: ${returnValue.size} remaining size: ${updated.size}")
-            setValue(updated)
+            setValue(Pair(updated, currentPair.second))
         } else {
-            setValue(ByteArray(0))
+            setValue(Pair(ByteArray(0), currentPair.second))
             Log.d(this.javaClass.name, "Returning size: ${returnValue.size} remaining size: null")
         }
 
