@@ -4,7 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.strobel.emercast.db.EmercastDbHelper
+import com.strobel.emercast.db.models.BroadcastMessage
 import com.strobel.emercast.protobuf.BroadcastMessageInfoListPBO
+import com.strobel.emercast.protobuf.BroadcastMessageInfoPBO
 import com.strobel.emercast.protobuf.BroadcastMessagePBO
 import com.strobel.emercast.services.BroadcastMessageService
 import com.strobel.emercast.services.BroadcastMessageService.Companion.toDBO
@@ -42,61 +44,45 @@ class ClientProtocolLogic(private val context: Context) {
         getBroadcastMessage: Function<String, BroadcastMessagePBO>,
         writeBroadcastMessage: Consumer<BroadcastMessagePBO>
     ) {
-        var localMessageList = broadcastMessageService.getAllMessages(systemMessage)
-        var remoteMessageInfoList = getCurrentBroadcastMessageInfoList.apply(systemMessage).messagesList
-        var addedMessages = 0
+        val localMessageList = broadcastMessageService.getAllMessages(systemMessage)
+        val remoteMessageInfoList = getCurrentBroadcastMessageInfoList.apply(systemMessage).messagesList
+        var sentMessages = 0
+        var receivedMessages = 0
+
+        val allMessageSet = HashSet<BroadcastMessageInfoPBO>()
+        val localMessageMap = HashMap<String, BroadcastMessage>()
+        val remoteMessageInfoMap = HashMap<String, BroadcastMessageInfoPBO>()
+
+        remoteMessageInfoList.forEach { remoteMessageInfoMap[it.id] = it }
+        allMessageSet.addAll(remoteMessageInfoList)
+
+        localMessageList.forEach { localMessageMap[it.id] = it }
+        allMessageSet.addAll(localMessageList.map { BroadcastMessageInfoPBO.newBuilder().setId(it.id).setCreated(it.created).build() })
+
+        var allMessages = allMessageSet.toList()
 
         if(systemMessage) {
-            localMessageList = localMessageList.sortedBy { it.created }
-           remoteMessageInfoList = remoteMessageInfoList.sortedBy { it.created }
+            allMessages = allMessages.sortedBy { it.created }
         } else {
-            localMessageList = localMessageList.sortedByDescending { it.created }
-            remoteMessageInfoList = remoteMessageInfoList.sortedByDescending { it.created }
+            allMessages = allMessages.sortedByDescending { it.created }
         }
 
-        var localIndex = 0
-        var remoteIndex = 0
+        for (msg in allMessages) {
+            val local = localMessageMap.containsKey(msg.id)
+            val remote = remoteMessageInfoMap.containsKey(msg.id)
 
-        while (localIndex < localMessageList.size || remoteIndex < remoteMessageInfoList.size) {
-            val localElement = if(localIndex < localMessageList.size) localMessageList[localIndex] else null
-            val remoteElement = if(remoteIndex < remoteMessageInfoList.size) remoteMessageInfoList[remoteIndex] else null
-
-            if(localElement == null && remoteElement == null) break
-
-            if(localElement == null || remoteElement == null) {
-                if(localElement == null) {
-                    broadcastMessageService.handleBroadcastMessageReceived(getBroadcastMessage.apply(remoteElement!!.id).toDBO(), context)
-                    addedMessages++
-                    remoteIndex++
-                }
-                if(remoteElement == null) {
-                    writeBroadcastMessage.accept(localElement!!.toPBO())
-                    localIndex++
-                }
+            if(local == remote) {
                 continue
-            }
-
-            if(localElement.created == remoteElement.created) {
-                localIndex++
-                remoteIndex++
-
-                if(localElement.id != remoteElement.id) {
-                    broadcastMessageService.handleBroadcastMessageReceived(getBroadcastMessage.apply(remoteElement.id).toDBO(), context)
-                    addedMessages++
-                    writeBroadcastMessage.accept(localElement.toPBO())
-                }
-
-                continue
-            } else if (localElement.created < remoteElement.created) {
-                writeBroadcastMessage.accept(localElement.toPBO())
-                localIndex++
+            } else if (local) {
+                writeBroadcastMessage.accept(localMessageMap[msg.id]!!.toPBO())
+                sentMessages++
             } else {
-                broadcastMessageService.handleBroadcastMessageReceived(getBroadcastMessage.apply(remoteElement.id).toDBO(), context)
-                addedMessages++
-                remoteIndex++
+                broadcastMessageService.handleBroadcastMessageReceived(getBroadcastMessage.apply(remoteMessageInfoMap[msg.id]!!.id).toDBO(), context)
+                receivedMessages++
             }
         }
-        Log.d(this.javaClass.name, "Finished syncBroadcastMessages")
+
+        Log.d(this.javaClass.name, "Finished syncBroadcastMessages Received: $receivedMessages Sent: $sentMessages")
 
         Intent().also { intent ->
             intent.setAction("com.strobel.emercast.NEW_BROADCAST_MESSAGE")
