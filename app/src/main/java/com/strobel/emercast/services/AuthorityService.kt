@@ -5,6 +5,8 @@ import com.strobel.emercast.db.models.Authority
 import com.strobel.emercast.db.models.BroadcastMessage
 import com.strobel.emercast.db.repositories.AuthoritiesRepository
 import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
+import com.strobel.emercast.db.repositories.JurisdictionMarkersRepository
+import com.strobel.emercast.lib.LocationUtils
 import com.strobel.emercast.protobuf.SystemBroadcastMessageAuthorityIssuedPayloadPBO
 import com.strobel.emercast.protobuf.SystemBroadcastMessageAuthorityRevokedPayloadPBO
 import java.security.KeyFactory
@@ -19,6 +21,7 @@ import javax.crypto.Cipher
 class AuthorityService(dbHelper: EmercastDbHelper) {
 
     private val authoritiesRepository = AuthoritiesRepository(dbHelper)
+    private val jurisdictionMarkersRepository = JurisdictionMarkersRepository(dbHelper)
 
     fun handleNewSystemAuthorityIssuedMessage(broadcastMessage: BroadcastMessage, pinnedRootAuthorityPublicKey: String): Boolean {
         val payload = SystemBroadcastMessageAuthorityIssuedPayloadPBO.parseFrom(Base64.getDecoder().decode(broadcastMessage.content))
@@ -54,6 +57,16 @@ class AuthorityService(dbHelper: EmercastDbHelper) {
 
     fun verifyBroadcastMessage(broadcastMessage: BroadcastMessage): Boolean {
         val parentAuthority = authoritiesRepository.getAuthority(broadcastMessage.issuedAuthorityId,  broadcastMessage.created) ?: return false
+        val parentJurisdictionMarkers = jurisdictionMarkersRepository.getForAuthority(parentAuthority.id, parentAuthority.created)
+
+        if(!LocationUtils.isRadiusWithinJurisdiction(
+                parentJurisdictionMarkers.map { it.toOpenAPI() },
+                broadcastMessage.latitude.toDouble(),
+                broadcastMessage.longitude.toDouble(),
+                broadcastMessage.radius.toDouble()
+            )) {
+            return false
+        }
 
         return verifyContentWasSignedByAuthority(
             parentAuthority,

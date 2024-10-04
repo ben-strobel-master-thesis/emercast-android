@@ -3,6 +3,8 @@ package com.strobel.emercast.db.repositories
 import android.content.ContentValues
 import android.database.Cursor
 import android.provider.BaseColumns
+import com.openapi.gen.android.dto.JurisdictionMarkerDTO
+import com.openapi.gen.android.dto.JurisdictionMarkerKindEnumDTO
 import com.strobel.emercast.db.EmercastDbHelper
 import com.strobel.emercast.db.models.Authority
 import com.strobel.emercast.db.models.JurisdictionMarker
@@ -35,7 +37,7 @@ class JurisdictionMarkersRepository(private val dbHelper: EmercastDbHelper) {
         return getForAuthority(authorityId, authorityCreated).map { markerToString(it) }.joinToString("")
     }
 
-    private fun getForAuthority(authorityId: String, authorityCreated: Long): List<JurisdictionMarker> {
+    fun getForAuthority(authorityId: String, authorityCreated: Long): List<JurisdictionMarker> {
         val db = this.dbHelper.readableDatabase
 
         val cursor = db.query(
