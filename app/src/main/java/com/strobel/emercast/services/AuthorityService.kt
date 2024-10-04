@@ -40,7 +40,28 @@ class AuthorityService(dbHelper: EmercastDbHelper) {
         if(authority.id == ROOT_AUTHORITY_UUID && authority.publicKeyBase64 != pinnedRootAuthorityPublicKey) return false
 
         if(broadcastMessage.issuedAuthorityId != authority.createdBy) return false
+
+        val parentAuthority = authoritiesRepository.getAuthority(broadcastMessage.issuedAuthorityId,  broadcastMessage.created) ?: return false
+        val parentJurisdictionMarkers = jurisdictionMarkersRepository.getForAuthority(parentAuthority.id, parentAuthority.created)
+
+        if(!LocationUtils.isRadiusWithinJurisdiction(
+                parentJurisdictionMarkers.map { it.toOpenAPI() },
+                broadcastMessage.latitude.toDouble(),
+                broadcastMessage.longitude.toDouble(),
+                broadcastMessage.radius.toDouble()
+            )) {
+            return false
+        }
+
         authoritiesRepository.newRow(authority)
+        payload.authority.jurisdictionMarkersList.forEach{jurisdictionMarkersRepository.newRow(
+            payload.authority.id,
+            payload.authority.created,
+            it.latitude,
+            it.longitude,
+            it.kind,
+            it.radiusMeter
+        )}
         return true
     }
 
@@ -86,7 +107,7 @@ class AuthorityService(dbHelper: EmercastDbHelper) {
         val plainHashedContent =  md.digest(plainContent)
 
         val signedBytes = Base64.getDecoder().decode(signedContent)
-        val cipher = Cipher.getInstance("RSA");
+        val cipher = Cipher.getInstance("RSA")
         cipher.init(Cipher.DECRYPT_MODE, getPublicKey(signerAuthority))
         var decryptedBytes = cipher.doFinal(signedBytes)
         if(decryptedBytes.size < 255) return false
