@@ -110,6 +110,7 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.protobuf)
+    implementation(libs.play.services.location)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

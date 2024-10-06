@@ -1,6 +1,7 @@
 package com.strobel.emercast
 
 import android.annotation.SuppressLint
+import android.app.PendingIntent
 import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.ComponentName
@@ -20,12 +21,16 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.getSystemService
 import androidx.lifecycle.lifecycleScope
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
 import com.strobel.emercast.ble.BLEAdvertiserService
 import com.strobel.emercast.ble.BLEAdvertiserService.Companion.hasPermissions
 import com.strobel.emercast.db.EmercastDbHelper
 import com.strobel.emercast.db.repositories.BroadcastMessagesRepository
+import com.strobel.emercast.fcm.CurrentLocationReceiver
 import com.strobel.emercast.services.BroadcastMessageService
 import com.strobel.emercast.ui.theme.EmercastTheme
 import com.strobel.emercast.views.MessageListView
@@ -33,6 +38,7 @@ import com.strobel.emercast.views.MessageListViewModel
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
     private val manager: BluetoothManager? get() = applicationContext.getSystemService()!!
     private var bleAdvertiserService: BLEAdvertiserService? = null
     private var newBroadcastMessageReceiver: BroadcastReceiver? = null
@@ -93,6 +99,15 @@ class MainActivity : ComponentActivity() {
             Log.d(this.javaClass.name, "Registered new FCM token $token")
             Toast.makeText(baseContext, "Registered new FCM token $token", Toast.LENGTH_SHORT).show()
         })
+
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_PASSIVE, 600000).build()
+
+        fusedLocationProviderClient.requestLocationUpdates(locationRequest, PendingIntent.getBroadcast(
+            this.applicationContext,
+            1,
+            Intent(this.applicationContext, CurrentLocationReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+        ))
 
         FirebaseMessaging.getInstance().subscribeToTopic("test")
             .addOnCompleteListener { task ->

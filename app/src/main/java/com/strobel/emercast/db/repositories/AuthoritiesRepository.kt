@@ -51,7 +51,7 @@ class AuthoritiesRepository(private val dbHelper: EmercastDbHelper) {
             sortOrder
         );
 
-        if(!cursor.moveToFirst()) return null;
+        if(!cursor.moveToFirst()) return null
         val authority = getFromCursor(cursor)
         cursor.close()
         return authority

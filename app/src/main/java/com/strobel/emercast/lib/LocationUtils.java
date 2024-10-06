@@ -3,6 +3,7 @@ package com.strobel.emercast.lib;
 import com.openapi.gen.android.dto.JurisdictionMarkerDTO;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -12,6 +13,9 @@ public class LocationUtils {
 
     final static int EARTH_RADIUS_KM = 6371;
     final static int EARTH_RADIUS_M = EARTH_RADIUS_KM*1000;
+
+    private static final double geoAccuracyDegree = 0.1;
+    private static final double geoAccuracyMeters = LocationUtils.distance(0, 0, 0, geoAccuracyDegree);
 
     public static double distance(double lat1, double lat2, double lon1, double lon2) {
 
@@ -92,5 +96,29 @@ public class LocationUtils {
         double newLongDeg = Math.toDegrees(newLongRad);
 
         return new Pair(newLatDeg, newLongDeg);
+    }
+
+    public static String getTopicNameFromLatLong(Double latitude, Double longitude) {
+        return roundToNearestPointFive(latitude) + "|" + roundToNearestPointFive(longitude);
+    }
+
+    public static String[] getTopicsForLatLong(Float latitude, Double longitude) {
+        double[][] offsets = new double[9][2];
+        offsets[0] = new double[] {geoAccuracyDegree, geoAccuracyDegree};
+        offsets[1] = new double[] {geoAccuracyDegree, 0};
+        offsets[2] = new double[] {geoAccuracyDegree, -geoAccuracyDegree};
+        offsets[3] = new double[] {0, geoAccuracyDegree};
+        offsets[4] = new double[] {0, 0};
+        offsets[5] = new double[] {0, -geoAccuracyDegree};
+        offsets[6] = new double[] {-geoAccuracyDegree, geoAccuracyDegree};
+        offsets[7] = new double[] {-geoAccuracyDegree, 0};
+        offsets[8] = new double[] {-geoAccuracyDegree, -geoAccuracyDegree};
+
+        return Arrays.stream(offsets).map(o -> getTopicNameFromLatLong(o[0] + latitude, o[1] + longitude)).toArray(new String[0]);
+    }
+
+    public static Double roundToNearestPointFive(Double value) {
+        double factor = 1.0/geoAccuracyDegree;
+        return Math.round(value * factor) / factor;
     }
 }
