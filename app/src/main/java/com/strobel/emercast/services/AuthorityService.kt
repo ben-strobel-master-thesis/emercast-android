@@ -41,15 +41,19 @@ class AuthorityService(dbHelper: EmercastDbHelper) {
 
         if(broadcastMessage.issuedAuthorityId != authority.createdBy) return false
 
-        val parentAuthority = authoritiesRepository.getAuthority(broadcastMessage.issuedAuthorityId,  broadcastMessage.created) ?: return false
-        val parentJurisdictionMarkers = jurisdictionMarkersRepository.getForAuthority(parentAuthority.id, parentAuthority.created)
+        val parentAuthority = authoritiesRepository.getAuthority(broadcastMessage.issuedAuthorityId,  broadcastMessage.created)
+        if(parentAuthority != null && authority.id != ROOT_AUTHORITY_UUID) {
+            val parentJurisdictionMarkers = jurisdictionMarkersRepository.getForAuthority(parentAuthority.id, parentAuthority.created)
 
-        if(!LocationUtils.isRadiusWithinJurisdiction(
-                parentJurisdictionMarkers.map { it.toOpenAPI() },
-                broadcastMessage.latitude.toDouble(),
-                broadcastMessage.longitude.toDouble(),
-                broadcastMessage.radius.toDouble()
-            )) {
+            if(!LocationUtils.isRadiusWithinJurisdiction(
+                    parentJurisdictionMarkers.map { it.toOpenAPI() },
+                    broadcastMessage.latitude.toDouble(),
+                    broadcastMessage.longitude.toDouble(),
+                    broadcastMessage.radius.toDouble()
+                )) {
+                return false
+            }
+        } else if (parentAuthority == null && authority.id != ROOT_AUTHORITY_UUID) {
             return false
         }
 

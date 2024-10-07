@@ -99,10 +99,10 @@ public class LocationUtils {
     }
 
     public static String getTopicNameFromLatLong(Double latitude, Double longitude) {
-        return roundToNearestPointFive(latitude) + "|" + roundToNearestPointFive(longitude);
+        return roundToNearestPointFive(latitude) + "_" + roundToNearestPointFive(longitude);
     }
 
-    public static String[] getTopicsForLatLong(Float latitude, Double longitude) {
+    public static List<String> getTopicsForLatLong(Float latitude, Float longitude) {
         double[][] offsets = new double[9][2];
         offsets[0] = new double[] {geoAccuracyDegree, geoAccuracyDegree};
         offsets[1] = new double[] {geoAccuracyDegree, 0};
@@ -114,7 +114,7 @@ public class LocationUtils {
         offsets[7] = new double[] {-geoAccuracyDegree, 0};
         offsets[8] = new double[] {-geoAccuracyDegree, -geoAccuracyDegree};
 
-        return Arrays.stream(offsets).map(o -> getTopicNameFromLatLong(o[0] + latitude, o[1] + longitude)).toArray(new String[0]);
+        return Arrays.stream(offsets).map(o -> getTopicNameFromLatLong(o[0] + latitude, o[1] + longitude)).toList();
     }
 
     public static Double roundToNearestPointFive(Double value) {

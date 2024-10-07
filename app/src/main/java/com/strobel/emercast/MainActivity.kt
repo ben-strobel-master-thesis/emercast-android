@@ -23,6 +23,7 @@ import androidx.core.content.getSystemService
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
@@ -38,6 +39,7 @@ import com.strobel.emercast.views.MessageListViewModel
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    private val systemTopic: String = "system"
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
     private val manager: BluetoothManager? get() = applicationContext.getSystemService()!!
     private var bleAdvertiserService: BLEAdvertiserService? = null
@@ -108,16 +110,14 @@ class MainActivity : ComponentActivity() {
             Intent(this.applicationContext, CurrentLocationReceiver::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
         ))
-
-        FirebaseMessaging.getInstance().subscribeToTopic("test")
-            .addOnCompleteListener { task ->
-                var msg = "Subscribed"
-                if (!task.isSuccessful) {
-                    msg = "Subscribe failed"
-                }
-                Log.d(this.javaClass.name, msg)
-                Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
+        fusedLocationProviderClient.lastLocation.addOnCompleteListener {
+            if(it.isSuccessful) {
+                CurrentLocationReceiver.handleNewLocation(it.result, this.applicationContext)
+            } else {
+                Log.d(this.javaClass.name, "Last location couldn't be obtained")
             }
+        }
+        FirebaseMessaging.getInstance().subscribeToTopic(systemTopic)
 
         newBroadcastMessageReceiver = object: BroadcastReceiver() {
             override fun onReceive(p0: Context?, p1: Intent?) {
@@ -135,6 +135,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this)
         val dbHelper = EmercastDbHelper(applicationContext)
         val repo = BroadcastMessagesRepository(dbHelper)
         viewModel = MessageListViewModel(repo)
@@ -163,8 +164,6 @@ class MainActivity : ComponentActivity() {
         if (isGranted) {
             Log.i(this.javaClass.name, "FCM is allowed to post notifications")
             // FCM SDK (and your app) can post notifications.
-        } else {
-            // TODO: Inform user that that your app will not show notifications.
         }
     }
 

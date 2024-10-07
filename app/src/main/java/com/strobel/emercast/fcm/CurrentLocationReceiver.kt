@@ -3,6 +3,7 @@ package com.strobel.emercast.fcm
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.location.Location
 import android.util.Log
 import com.google.android.gms.location.LocationResult
 import com.google.firebase.messaging.FirebaseMessaging
@@ -25,16 +26,35 @@ class CurrentLocationReceiver: BroadcastReceiver() {
             return
         }
 
-        val previousLocation = repo.getCurrent()
-        val newLocation = locationResult.lastLocation!!
-        repo.update(newLocation.latitude.toFloat(), newLocation.longitude.toFloat())
+        handleNewLocation(locationResult.lastLocation!!, context)
+    }
 
-        val previousLocationRounded = if (previousLocation == null) Pair(0.0,0.0) else  Pair(LocationUtils.roundToNearestPointFive(previousLocation.first.toDouble()), LocationUtils.roundToNearestPointFive(
-            previousLocation.second.toDouble()))
-        val newLocationRounded = Pair(LocationUtils.roundToNearestPointFive(newLocation.latitude), LocationUtils.roundToNearestPointFive(newLocation.longitude))
+    companion object {
+        fun handleNewLocation(newLocation: Location, context: Context) {
+            val dbHelper = EmercastDbHelper(context)
+            val repo = CurrentLocationRepository(dbHelper)
 
-        if(previousLocationRounded.first == newLocationRounded.first && previousLocationRounded.second == newLocationRounded.second) return
+            val previousLocation = repo.getCurrent()
+            repo.update(newLocation.latitude.toFloat(), newLocation.longitude.toFloat())
 
-        FirebaseMessaging.getInstance().unsubscribeFromTopic()
+            val previousLocationRounded = if (previousLocation == null) Pair(0.0,0.0) else  Pair(LocationUtils.roundToNearestPointFive(previousLocation.first.toDouble()), LocationUtils.roundToNearestPointFive(
+                previousLocation.second.toDouble()))
+            val newLocationRounded = Pair(LocationUtils.roundToNearestPointFive(newLocation.latitude), LocationUtils.roundToNearestPointFive(newLocation.longitude))
+
+            if(previousLocationRounded.first == newLocationRounded.first && previousLocationRounded.second == newLocationRounded.second) return
+
+            Log.d(this.javaClass.name, "Received new location, location topic has changed")
+
+            if(previousLocation != null) {
+                LocationUtils.getTopicsForLatLong(previousLocation.first, previousLocation.second).forEach {
+                    FirebaseMessaging.getInstance().unsubscribeFromTopic(it)
+                }
+            }
+
+            LocationUtils.getTopicsForLatLong(newLocationRounded.first.toFloat(), newLocationRounded.second.toFloat()).forEach {
+                FirebaseMessaging.getInstance().subscribeToTopic(it)
+                Log.d(this.javaClass.name, "Subscribed to topic: $it")
+            }
+        }
     }
 }

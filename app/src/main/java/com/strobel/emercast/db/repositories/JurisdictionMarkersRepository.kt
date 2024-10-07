@@ -44,11 +44,11 @@ class JurisdictionMarkersRepository(private val dbHelper: EmercastDbHelper) {
             EmercastDbHelper.Companion.JurisdictionMarkerEntry.TABLE_NAME,
             null,
             "${EmercastDbHelper.Companion.JurisdictionMarkerEntry.COLUMN_NAME_AUTHORITY_ID} = ? and " +
-            "${EmercastDbHelper.Companion.JurisdictionMarkerEntry.COLUMN_NAME_AUTHORITY_CREATED} = ? and ",
+            "${EmercastDbHelper.Companion.JurisdictionMarkerEntry.COLUMN_NAME_AUTHORITY_CREATED} = ? ",
             arrayOf(authorityId, ""+authorityCreated),
             null,
             null,
-            "${BaseColumns._ID} ASC"
+            null
         )
 
         val markers = mutableListOf<JurisdictionMarker>()

@@ -10,8 +10,9 @@ class EmercastDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(SQL_CREATE_BROADCAST_MESSAGES)
-        db.execSQL(SQL_CREATE_JURISDICTION_MARKERS)
         db.execSQL(SQL_CREATE_AUTHORITIES)
+        db.execSQL(SQL_CREATE_JURISDICTION_MARKERS)
+        db.execSQL(SQL_CREATE_CURRENT_LOCATIONS)
 
         db.execSQL(SQL_CREATE_AUTHORITIES_INDEX)
         db.execSQL(SQL_CREATE_JURISDICTION_MARKERS_INDEX)
@@ -23,13 +24,6 @@ class EmercastDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
         db.execSQL(SQL_DELETE_JURISDICTION_MARKERS_TABLE)
         db.execSQL(SQL_DELETE_CURRENT_LOCATIONS_TABLE)
 
-        db.execSQL(SQL_CREATE_BROADCAST_MESSAGES)
-        db.execSQL(SQL_CREATE_JURISDICTION_MARKERS)
-        db.execSQL(SQL_CREATE_AUTHORITIES)
-
-        db.execSQL(SQL_CREATE_AUTHORITIES_INDEX)
-        db.execSQL(SQL_CREATE_JURISDICTION_MARKERS_INDEX)
-        db.execSQL(SQL_CREATE_CURRENT_LOCATIONS)
         onCreate(db)
     }
     override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -37,7 +31,7 @@ class EmercastDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
     }
     companion object {
         // If you change the database schema, you must increment the database version.
-        const val DATABASE_VERSION = 3
+        const val DATABASE_VERSION = 5
         const val DATABASE_NAME = "Emercast.db"
 
         object AuthorityEntry: BaseColumns {
@@ -91,7 +85,7 @@ class EmercastDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
             const val COLUMN_NAME_ID = "id"
             const val COLUMN_NAME_LATITUDE = "latitude"
             const val COLUMN_NAME_LONGITUDE = "longitude"
-            const val COLUMN_NAME_LAST_CHANGE = "longitude"
+            const val COLUMN_NAME_LAST_CHANGE = "lastChange"
         }
 
         private const val SQL_CREATE_CURRENT_LOCATIONS =
