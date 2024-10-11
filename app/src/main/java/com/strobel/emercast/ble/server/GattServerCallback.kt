@@ -3,6 +3,7 @@ package com.strobel.emercast.ble.server
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattServerCallback
+import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothProfile
 import android.util.Log
 import com.strobel.emercast.ble.protocol.ServerProtocolLogic
@@ -96,6 +97,11 @@ class GattServerCallback(
     ) {
         super.onCharacteristicReadRequest(device, requestId, offset, characteristic)
         Log.d(this.javaClass.name, "onCharacteristicReadRequest: $requestId $offset ${characteristic?.uuid}")
+    }
+
+    override fun onServiceAdded(status: Int, service: BluetoothGattService?) {
+        super.onServiceAdded(status, service)
+        Log.d(this.javaClass.name, "onServiceAdded: $status ${service?.uuid}")
     }
 
     private fun sendCharacteristic(valueGetter: () -> ByteArray, sendResponse: (ByteArray) -> Int) {

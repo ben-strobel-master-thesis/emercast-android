@@ -73,6 +73,7 @@ class GattServerWorker(private val appContext: Context, workerParams: WorkerPara
         val POST_BROADCAST_MESSAGE_CHARACTERISTIC_UUID: UUID = UUID.fromString("7323fe0e-5691-4090-0004-48b1782de633")
 
         private fun addCharacteristicToService(service: BluetoothGattService, uuid: UUID) {
+            Log.d(this.javaClass.name, "Adding characeristic $uuid to service ${service.uuid}")
             service.addCharacteristic(
                 BluetoothGattCharacteristic(
                     uuid,

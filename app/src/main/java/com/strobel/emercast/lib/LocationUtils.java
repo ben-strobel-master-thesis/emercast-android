@@ -114,7 +114,11 @@ public class LocationUtils {
         offsets[7] = new double[] {-geoAccuracyDegree, 0};
         offsets[8] = new double[] {-geoAccuracyDegree, -geoAccuracyDegree};
 
-        return Arrays.stream(offsets).map(o -> getTopicNameFromLatLong(o[0] + latitude, o[1] + longitude)).toList();
+        List<String> topics = new ArrayList<>();
+        for (double[] o : offsets) {
+            topics.add(getTopicNameFromLatLong(o[0] + latitude, o[1] + longitude));
+        }
+        return topics;
     }
 
     public static Double roundToNearestPointFive(Double value) {
