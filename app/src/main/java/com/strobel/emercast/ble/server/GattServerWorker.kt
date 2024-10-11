@@ -6,12 +6,18 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattServer
 import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothManager
+import android.bluetooth.le.AdvertiseCallback
+import android.bluetooth.le.AdvertiseData
+import android.bluetooth.le.AdvertiseSettings
+import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.Context
+import android.os.ParcelUuid
 import android.util.Log
 import androidx.core.content.getSystemService
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.strobel.emercast.GlobalInMemoryAppStateSingleton
+import com.strobel.emercast.ble.BLEAdvertiserService.Companion.STARTED_SERVICE_UUID
 import com.strobel.emercast.ble.BLEScanReceiver.Companion.GATT_SERVER_SERVICE_UUID
 import com.strobel.emercast.ble.enums.GattRoleEnum
 import com.strobel.emercast.ble.protocol.ServerProtocolLogic
@@ -21,6 +27,7 @@ class GattServerWorker(private val appContext: Context, workerParams: WorkerPara
     private val manager: BluetoothManager? get() = applicationContext.getSystemService()!!
     private lateinit var server: BluetoothGattServer
     private val globalAppStateSingleton = GlobalInMemoryAppStateSingleton.getInstance()
+    private var advertiser: BluetoothLeAdvertiser? = null
 
     @SuppressLint("MissingPermission")
     private fun sendResponse(device: BluetoothDevice, characteristic: BluetoothGattCharacteristic, value: ByteArray): Int {
@@ -30,11 +37,11 @@ class GattServerWorker(private val appContext: Context, workerParams: WorkerPara
     @SuppressLint("MissingPermission")
     override fun doWork(): Result {
         Log.d(this.javaClass.name, "${this.applicationContext}")
-        val serverProtocolLogic = ServerProtocolLogic(this.applicationContext)
+        val serverProtocolLogic = ServerProtocolLogic(this.applicationContext, ::startAdvertisingServerStartedService)
 
         server = manager!!.openGattServer(this.applicationContext, GattServerCallback(::sendResponse, serverProtocolLogic))
 
-        serverProtocolLogic.onServerStarted { id ->
+        serverProtocolLogic.registerServiceCharaceristics { id ->
             addCharacteristicToService(
                 service,
                 UUID.fromString(id)
@@ -52,6 +59,7 @@ class GattServerWorker(private val appContext: Context, workerParams: WorkerPara
 
         Log.d(this.javaClass.name, "GattServerWorker finished")
         globalAppStateSingleton.gattRole = GattRoleEnum.UNDETERMINED
+        stopAdvertisingServerStartedService()
         server.close()
         return Result.success()
     }
@@ -61,6 +69,43 @@ class GattServerWorker(private val appContext: Context, workerParams: WorkerPara
         super.onStopped()
         globalAppStateSingleton.gattRole = GattRoleEnum.UNDETERMINED
         server.close()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startAdvertisingServerStartedService() {
+        val bluetoothManager = this.appContext.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        advertiser = bluetoothManager.adapter!!.bluetoothLeAdvertiser
+
+        val settings = AdvertiseSettings.Builder()
+            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
+            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
+            .setTimeout(0)
+            .build()
+
+        val data = AdvertiseData.Builder()
+            .addServiceUuid(ParcelUuid(STARTED_SERVICE_UUID))
+            .build()
+
+        advertiser?.stopAdvertising(com.strobel.emercast.ble.BLEAdvertiserService.BLEAdvertiseCallback)
+        advertiser?.startAdvertising(settings, data,
+            com.strobel.emercast.ble.BLEAdvertiserService.BLEAdvertiseCallback
+        )
+        Log.d(this.javaClass.name, "Started advertising that the server has started")
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun stopAdvertisingServerStartedService() {
+        advertiser?.stopAdvertising(BLEAdvertiseCallback)
+    }
+
+    object BLEAdvertiseCallback : AdvertiseCallback() {
+        override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
+            Log.i(this.javaClass.name, "Started advertising")
+        }
+
+        override fun onStartFailure(errorCode: Int) {
+            Log.e(this.javaClass.name, "Failed to start advertising: $errorCode")
+        }
     }
 
     companion object {

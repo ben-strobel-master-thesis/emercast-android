@@ -82,13 +82,13 @@ class BLEAdvertiserService: Service() {
             .build()
 
         val data = AdvertiseData.Builder()
-            .addServiceUuid(ParcelUuid(SERVICE_UUID))
+            .addServiceUuid(ParcelUuid(EXIST_SERVICE_UUID))
             // Hash is being truncated -> higher collision probability, but rather more false positives than false negatives -> false positives will be resolved on connection
             .addServiceData(ParcelUuid(SERVICE_HASH_DATA_UUID), currentHash)
             .build()
 
-        advertiser?.stopAdvertising(SampleAdvertiseCallback)
-        advertiser?.startAdvertising(settings, data, SampleAdvertiseCallback)
+        advertiser?.stopAdvertising(BLEAdvertiseCallback)
+        advertiser?.startAdvertising(settings, data, BLEAdvertiseCallback)
         Log.d(this.javaClass.name, "Started Advertising with hash ${currentHash.toString(Charsets.UTF_8)}")
     }
 
@@ -114,7 +114,7 @@ class BLEAdvertiserService: Service() {
         // We only want the devices running our GATTServerSample
         val scanFilters = listOf(
             ScanFilter.Builder()
-                .setServiceUuid(ParcelUuid(SERVICE_UUID))
+                .setServiceUuid(ParcelUuid(EXIST_SERVICE_UUID))
                 .build(),
         )
         scanner?.startScan(scanFilters, scanSettings, resultIntent)
@@ -122,13 +122,13 @@ class BLEAdvertiserService: Service() {
         return resultIntent
     }
 
-    object SampleAdvertiseCallback : AdvertiseCallback() {
+    object BLEAdvertiseCallback : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
-            Log.i("BLE_EXPERIMENT_MAIN_ACTIVITY", "Started advertising")
+            Log.i(this.javaClass.name, "Started advertising")
         }
 
         override fun onStartFailure(errorCode: Int) {
-            Log.e("BLE_EXPERIMENT_MAIN_ACTIVITY", "Failed to start advertising: $errorCode")
+            Log.e(this.javaClass.name, "Failed to start advertising: $errorCode")
         }
     }
 
@@ -141,11 +141,12 @@ class BLEAdvertiserService: Service() {
     }
 
     companion object {
-        const val ACTUAL_16_BIT_SERVICE_UUID = "b570"
+        const val ACTUAL_16_BIT_EXIST_SERVICE_UUID = "b570"
+        const val ACTUAL_16_BIT_STARTED_SERVICE_UUID = "b572"
         const val ACTUAL_16_BIT_HASH_DATA_UUID = "b571"
-        val SERVICE_UUID: UUID = UUID.fromString("0000${ACTUAL_16_BIT_SERVICE_UUID}-0000-1000-8000-00805F9B34FB")
+        val EXIST_SERVICE_UUID: UUID = UUID.fromString("0000${ACTUAL_16_BIT_EXIST_SERVICE_UUID}-0000-1000-8000-00805F9B34FB")
+        val STARTED_SERVICE_UUID: UUID = UUID.fromString("0000${ACTUAL_16_BIT_STARTED_SERVICE_UUID}-0000-1000-8000-00805F9B34FB")
         val SERVICE_HASH_DATA_UUID: UUID = UUID.fromString("0000${ACTUAL_16_BIT_HASH_DATA_UUID}-0000-1000-8000-00805F9B34FB")
-        val TAG = "BLEAdvertiserService"
         val REQUIRED_PERMISSIONS: Array<String> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) arrayOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.BLUETOOTH_SCAN,

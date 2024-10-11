@@ -1,11 +1,13 @@
 package com.strobel.emercast.ble.server
 
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattServerCallback
 import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothProfile
 import android.util.Log
+import com.strobel.emercast.ble.BLEAdvertiserService
 import com.strobel.emercast.ble.protocol.ServerProtocolLogic
 import com.strobel.emercast.protobuf.BroadcastMessagePBO
 import java.nio.ByteBuffer
@@ -102,6 +104,10 @@ class GattServerCallback(
     override fun onServiceAdded(status: Int, service: BluetoothGattService?) {
         super.onServiceAdded(status, service)
         Log.d(this.javaClass.name, "onServiceAdded: $status ${service?.uuid}")
+
+        if(service?.uuid == BLEAdvertiserService.EXIST_SERVICE_UUID && status == BluetoothGatt.GATT_SUCCESS) {
+            serverProtocolLogic.onServerStarted()
+        }
     }
 
     private fun sendCharacteristic(valueGetter: () -> ByteArray, sendResponse: (ByteArray) -> Int) {

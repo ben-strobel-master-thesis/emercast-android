@@ -1,5 +1,7 @@
 package com.strobel.emercast.ble.protocol
 
+import android.bluetooth.BluetoothManager
+import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.Context
 import android.content.Intent
 import com.strobel.emercast.db.EmercastDbHelper
@@ -11,14 +13,18 @@ import com.strobel.emercast.services.BroadcastMessageService.Companion.toInfoPBO
 import com.strobel.emercast.services.BroadcastMessageService.Companion.toPBO
 import java.util.function.Consumer
 
-class ServerProtocolLogic(private val context: Context) {
+class ServerProtocolLogic(private val context: Context, private val startAdvertisingServerStartedService: () -> Unit) {
 
     val teardownLock = Object()
     private val broadcastMessageService = BroadcastMessageService(EmercastDbHelper(context))
 
-    fun onServerStarted(registerAvailableMessageId: Consumer<String>) {
+    fun registerServiceCharaceristics(registerAvailableMessageId: Consumer<String>) {
         broadcastMessageService.getAllMessages(true).forEach{registerAvailableMessageId.accept(it.id)}
         broadcastMessageService.getAllMessages(false).forEach{registerAvailableMessageId.accept(it.id)}
+    }
+
+    fun onServerStarted() {
+        startAdvertisingServerStartedService()
     }
 
     fun onDisconnected() {
