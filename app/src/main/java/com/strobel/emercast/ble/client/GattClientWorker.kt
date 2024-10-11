@@ -28,7 +28,13 @@ class GattClientWorker(private val appContext: Context, workerParams: WorkerPara
         gatt = device.connectGatt(appContext, false, GattClientCallback(clientProtocolLogic))
         Log.d(this.javaClass.name, "Connect initialized")
 
-        Thread.sleep(1000*15)
+        try {
+            synchronized(clientProtocolLogic.teardownLock) {
+                clientProtocolLogic.teardownLock.wait(1000*15)
+            }
+        } catch (ex: Exception) {
+            Log.d(this.javaClass.name, ex.stackTraceToString())
+        }
 
         Log.d(this.javaClass.name, "GattClientWorker finished")
         globalAppStateSingleton.gattRole = GattRoleEnum.UNDETERMINED

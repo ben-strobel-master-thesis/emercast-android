@@ -16,6 +16,7 @@ import java.util.function.Function
 
 class ClientProtocolLogic(private val context: Context) {
 
+    val teardownLock = Object()
     private val broadcastMessageService = BroadcastMessageService(EmercastDbHelper(context))
 
     fun connectedToServer(
@@ -36,6 +37,10 @@ class ClientProtocolLogic(private val context: Context) {
         if(localNonSystemMessageChainHash != remoteNonSystemMessageChainHash) {
             syncBroadcastMessages(false, getCurrentBroadcastMessageInfoList, getBroadcastMessage, writeBroadcastMessage)
         }
+    }
+
+    fun onDisconnected() {
+        synchronized(teardownLock) { teardownLock.notifyAll() }
     }
 
     private fun syncBroadcastMessages(

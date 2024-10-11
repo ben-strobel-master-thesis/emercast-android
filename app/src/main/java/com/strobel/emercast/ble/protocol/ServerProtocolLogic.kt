@@ -13,11 +13,16 @@ import java.util.function.Consumer
 
 class ServerProtocolLogic(private val context: Context) {
 
+    val teardownLock = Object()
     private val broadcastMessageService = BroadcastMessageService(EmercastDbHelper(context))
 
     fun onServerStarted(registerAvailableMessageId: Consumer<String>) {
         broadcastMessageService.getAllMessages(true).forEach{registerAvailableMessageId.accept(it.id)}
         broadcastMessageService.getAllMessages(false).forEach{registerAvailableMessageId.accept(it.id)}
+    }
+
+    fun onDisconnected() {
+        synchronized(teardownLock) { teardownLock.notifyAll() }
     }
 
     fun getBroadcastMessageChainHash(systemMessage: Boolean): String {

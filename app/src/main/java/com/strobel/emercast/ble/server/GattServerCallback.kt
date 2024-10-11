@@ -3,6 +3,7 @@ package com.strobel.emercast.ble.server
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattServerCallback
+import android.bluetooth.BluetoothProfile
 import android.util.Log
 import com.strobel.emercast.ble.protocol.ServerProtocolLogic
 import com.strobel.emercast.protobuf.BroadcastMessagePBO
@@ -31,6 +32,11 @@ class GattServerCallback(
     ) {
         super.onConnectionStateChange(device, status, newState)
         Log.d(this.javaClass.name, "onConnectionStateChange: $status $newState")
+
+        // Only one client at a time, so disconnect means worker can be torn down
+        if(newState == BluetoothProfile.STATE_DISCONNECTED) {
+            serverProtocolLogic.onDisconnected()
+        }
     }
 
     override fun onCharacteristicWriteRequest(

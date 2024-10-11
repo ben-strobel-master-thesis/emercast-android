@@ -111,7 +111,7 @@ class MainActivity : ComponentActivity() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
         ))
         fusedLocationProviderClient.lastLocation.addOnCompleteListener {
-            if(it.isSuccessful) {
+            if(it.isSuccessful && it.result != null) {
                 CurrentLocationReceiver.handleNewLocation(it.result, this.applicationContext)
             } else {
                 Log.d(this.javaClass.name, "Last location couldn't be obtained")

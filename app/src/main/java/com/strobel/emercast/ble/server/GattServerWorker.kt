@@ -42,7 +42,13 @@ class GattServerWorker(private val appContext: Context, workerParams: WorkerPara
         }
         server.addService(service)
 
-        Thread.sleep(1000*20)
+        try {
+            synchronized(serverProtocolLogic.teardownLock) {
+                serverProtocolLogic.teardownLock.wait(1000*20)
+            }
+        } catch (ex: Exception) {
+            Log.d(this.javaClass.name, ex.stackTraceToString())
+        }
 
         Log.d(this.javaClass.name, "GattServerWorker finished")
         globalAppStateSingleton.gattRole = GattRoleEnum.UNDETERMINED

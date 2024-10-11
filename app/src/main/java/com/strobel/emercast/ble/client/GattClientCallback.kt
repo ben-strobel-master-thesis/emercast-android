@@ -40,6 +40,7 @@ class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): 
         if(newState == BluetoothProfile.STATE_DISCONNECTED) {
             gatt.disconnect()
             gatt.close()
+            clientProtocolLogic.onDisconnected()
         } else if (newState == BluetoothProfile.STATE_CONNECTED) {
             gatt.discoverServices()
             Log.d(this.javaClass.name, "Discovering services...")
