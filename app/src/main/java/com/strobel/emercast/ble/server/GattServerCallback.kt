@@ -74,10 +74,12 @@ class GattServerCallback(
             sendCharacteristic({serverProtocolLogic.getBroadcastMessageChainHash(false).encodeToByteArray()}, {sendResponse(device, characteristic, it)})
             return
         } else if(characteristic.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID) {
-            sendCharacteristic({serverProtocolLogic.getCurrentBroadcastMessageInfoList(true).toByteArray()}, {sendResponse(device, characteristic, it)})
+            val bytes = serverProtocolLogic.getCurrentBroadcastMessageInfoList(true).toByteArray()
+            sendCharacteristic({bytes}, {sendResponse(device, characteristic, it)})
             return
         } else if(characteristic.uuid == GattServerWorker.GET_BROADCAST_MESSAGE_NON_SYSTEM_INFO_LIST_CHARACTERISTIC_UUID) {
-            sendCharacteristic({serverProtocolLogic.getCurrentBroadcastMessageInfoList(false).toByteArray()}, {sendResponse(device, characteristic, it)})
+            val bytes = serverProtocolLogic.getCurrentBroadcastMessageInfoList(false).toByteArray()
+            sendCharacteristic({bytes}, {sendResponse(device, characteristic, it)})
             return
         } else {
             try {
@@ -111,7 +113,10 @@ class GattServerCallback(
     }
 
     private fun sendCharacteristic(valueGetter: () -> ByteArray, sendResponse: (ByteArray) -> Int) {
-        val value = valueGetter()
+        var value = valueGetter()
+        if(value.isEmpty()) {
+            value = ByteArray(1)
+        }
         Log.d(this.javaClass.name, "MTU for this read is ${this.mtu}")
         val chunkSize = this.mtu - 3
         var chunk = ByteBuffer.allocate(Int.SIZE_BYTES).putInt(value.size).array()

@@ -193,8 +193,11 @@ class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): 
     private fun readCharacteristics(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic): ByteArray {
         gatt.setCharacteristicNotification(characteristic, true)
         gatt.writeCharacteristic(characteristic, ByteArray(0), BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
-        val response = waitForResponse(characteristic) ?: throw TimeoutException("Server didn't respond within timeout")
+        var response = waitForResponse(characteristic) ?: throw TimeoutException("Server didn't respond within timeout")
         gatt.setCharacteristicNotification(characteristic, false)
+        if(response.size == 1 && response.get(0) == 0.toByte()) {
+            response = ByteArray(0)
+        }
         return response
     }
 
