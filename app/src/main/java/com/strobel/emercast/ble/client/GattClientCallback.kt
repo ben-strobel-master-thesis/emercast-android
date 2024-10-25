@@ -102,6 +102,11 @@ class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): 
         Log.d(this.javaClass.name, "onCharacteristicRead $status ${value.decodeToString()}")
     }
 
+    override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+        super.onCharacteristicWrite(gatt, characteristic, status)
+        Log.d(this.javaClass.name, "onCharacteristicWrite ${characteristic.uuid} $status")
+    }
+
     override fun onMtuChanged(gatt: BluetoothGatt?, mtu: Int, status: Int) {
         super.onMtuChanged(gatt, mtu, status)
         Log.d(this.javaClass.name, "onMtuChanged ${mtu}")
@@ -150,8 +155,8 @@ class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): 
             Log.d(this.javaClass.name, "Writing Broadcast Message: ${message.id}")
             val characteristic = service.getCharacteristic(GattServerWorker.POST_BROADCAST_MESSAGE_CHARACTERISTIC_UUID)
             val value = message.toByteArray()
-            Log.d(this.javaClass.name, "MTU for this read is ${this.mtu}")
-            val chunkSize = this.mtu - 3
+            Log.d(this.javaClass.name, "MTU for this operation is ${this.mtu}")
+            val chunkSize = (this.mtu - 3).coerceAtMost(512)
             var chunk = ByteBuffer.allocate(Int.SIZE_BYTES).putInt(value.size).array()
             var offset = 0
 
@@ -160,7 +165,13 @@ class GattClientCallback(private val clientProtocolLogic: ClientProtocolLogic): 
                 val upperBound = min(value.size, offset - (if (offset == 0) Int.SIZE_BYTES else 0 ) + chunkSize)
                 chunk += value.copyOfRange(offset, upperBound)
                 offset = upperBound
-                val result = gatt.writeCharacteristic(characteristic,chunk,BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) // Requiring ack -> packets arrive in order
+                var result = -1
+                while (result == -1 || result == 201) {
+                    if(result == 201) {
+                        Thread.sleep(1)
+                    }
+                    result = gatt.writeCharacteristic(characteristic,chunk,BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
+                }
                 Log.d(this.javaClass.name, "Sent chunk with size: ${chunk.size} new offset: $offset result: $result")
                 chunk = ByteArray(0)
             }

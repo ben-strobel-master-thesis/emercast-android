@@ -52,17 +52,19 @@ class GattServerCallback(
         value: ByteArray,
     ) {
         super.onCharacteristicWriteRequest(device, requestId, characteristic, preparedWrite, responseNeeded, offset, value)
-        Log.d(this.javaClass.name, "onCharacteristicWriteRequest: $requestId $offset ${characteristic.uuid}")
+        Log.d(this.javaClass.name, "onCharacteristicWriteRequest: $requestId $offset ${value.size} ${characteristic.uuid}")
 
         if(characteristic.uuid == GattServerWorker.POST_BROADCAST_MESSAGE_CHARACTERISTIC_UUID) {
             Log.d(this.javaClass.name, "Receiving broadcast message from client: ${characteristic.uuid} size: ${value.size}")
             var existingValue = characteristicWriteValueMap[characteristic.uuid.toString()] ?: ByteArray(0)
             existingValue += value
             characteristicWriteValueMap[characteristic.uuid.toString()] = existingValue
-            if(existingValue.size >= 4 && existingValue.size >= ByteBuffer.allocate(Int.SIZE_BYTES).put(existingValue.copyOfRange(0, Int.SIZE_BYTES)).getInt(0)) {
+            val totalByteSize = ByteBuffer.allocate(Int.SIZE_BYTES).put(existingValue.copyOfRange(0, Int.SIZE_BYTES)).getInt(0)
+            if(existingValue.size >= 4 && existingValue.size >= totalByteSize) {
                 try {
                     val messageBytes = characteristicWriteValueMap.remove(characteristic.uuid.toString())
                     val message = BroadcastMessagePBO.parseFrom(messageBytes?.sliceArray(4..<messageBytes.size))
+                    Log.d(this.javaClass.name, "Finished receiving broadcast message. Total size $totalByteSize")
                     serverProtocolLogic.receiveBroadcastMessage(message)
                 } catch (ex: Exception) {
                     Log.e(this.javaClass.name, "Failed onCharacteristicWriteRequest: " + ex.message)
