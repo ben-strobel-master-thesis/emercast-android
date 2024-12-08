@@ -11,7 +11,6 @@ import com.strobel.emercast.protobuf.SystemBroadcastMessageAuthorityIssuedPayloa
 import java.util.Base64
 
 
-// TODO Split into repo & service
 class AuthoritiesRepository(private val dbHelper: EmercastDbHelper) {
 
     fun newRow(authority: Authority): Long {
@@ -97,7 +96,7 @@ class AuthoritiesRepository(private val dbHelper: EmercastDbHelper) {
     }
 
     companion object {
-        // TODO This should be extracted into a shared library between server & clients
+        // For production: This could be extracted into a shared library between server & clients
         fun getMessageBytesForDigest(db: EmercastDbHelper, authority: Authority): ByteArray {
             val jurisdictionMarkersRepository = JurisdictionMarkersRepository(db)
 

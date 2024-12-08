@@ -46,8 +46,7 @@ import java.util.UUID
 
 class BLEScanReceiver : BroadcastReceiver() {
 
-    // TODO (Temporarily) Blacklist mac addresses when connection couldn't be established after multiple tries
-
+    // For production: (Temporarily) Blacklist mac addresses when connection couldn't be established after multiple tries
     override fun onReceive(context: Context, intent: Intent) {
         val globalAppStateSingleton = GlobalInMemoryAppStateSingleton.getInstance()
         if(globalAppStateSingleton.gattRole != GattRoleEnum.UNDETERMINED) return

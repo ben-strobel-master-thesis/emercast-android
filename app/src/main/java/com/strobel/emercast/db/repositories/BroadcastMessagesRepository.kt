@@ -8,7 +8,6 @@ import com.strobel.emercast.db.models.BroadcastMessage
 import java.security.MessageDigest
 import java.time.Instant
 
-// TODO Split into repo & service
 class BroadcastMessagesRepository(private val dbHelper: EmercastDbHelper) {
 
     fun newRow(broadcastMessage: BroadcastMessage) {

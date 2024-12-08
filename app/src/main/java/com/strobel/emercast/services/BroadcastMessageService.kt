@@ -41,7 +41,7 @@ class BroadcastMessageService(dbHelper: EmercastDbHelper) {
     }
 
     private suspend fun pullPaginatedBroadcastMessagesFromServer(systemMessage: Boolean, api: DefaultApi, context: Context) {
-        // TODO Optimize:
+        //  For production: Optimize:
         //  Non System Messages: (sync order newest -> oldest) Abort once hash is equal
         //  System Messages: (sync order oldest -> newest) Start at newest authority
 

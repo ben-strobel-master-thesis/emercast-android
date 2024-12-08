@@ -35,7 +35,7 @@ class ServerProtocolLogic(private val context: Context, private val startAdverti
         return broadcastMessageService.getMessageChainHash(systemMessage)
     }
 
-    // TODO This request should be paginated if this were to be deployed in production
+    // For production: This request should be paginated if this were to be deployed in production
     fun getCurrentBroadcastMessageInfoList(systemMessage: Boolean): BroadcastMessageInfoListPBO {
         return BroadcastMessageInfoListPBO
             .newBuilder()
